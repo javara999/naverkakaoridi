@@ -1,4 +1,4 @@
 # -*- coding: utf-8 -*-
-from .naverkakaoridi import NaverKakaoRidiMetadataProvider
+from .naverkakaoridi import PLUGIN_VERSION, NaverkakaoridiMetadataProvider
 
-__all__ = ["NaverKakaoRidiMetadataProvider"]
+__all__ = ["NaverkakaoridiMetadataProvider", "PLUGIN_VERSION"]

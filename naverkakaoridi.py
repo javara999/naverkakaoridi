@@ -5,6 +5,7 @@ import io
 import json
 import os
 import re
+import shutil
 import time
 import urllib.error
 import urllib.parse
@@ -14,10 +15,15 @@ from PIL import Image
 from plugins.metadata.base import BaseMetadataProvider
 
 
-class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
+PLUGIN_VERSION = "1.1.0"
+LEGACY_PLUGIN_ID = "naverkakaoridi_meta"
+DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
+
+
+class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
     id = "naverkakaoridi"
-    legacy_id = "naverkakaoridi_meta"
-    name = "네이버/카카오/리디 메타 검색"
+    name = "통합 웹툰/웹소설 검색(네이버/카카오/리디)"
+    version = PLUGIN_VERSION
     is_searchable = True
     config_schema = [
         {
@@ -26,14 +32,14 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
             "type": "text",
             "required": False,
             "default": "all",
-            "description": "기본값 all. 사용 가능: all, naver_webtoon, naver_series, kakao_webtoon, kakaopage, ridibooks. 여러 개는 콤마로 구분.",
+            "description": "기본값 all. 사용 가능: all, naver_webtoon, naver_series, kakao_webtoon, kakaopage, ridibooks, novelpia. 여러 개는 콤마로 구분.",
         },
         {
             "key": "MAX_RESULTS",
             "label": "최대 검색 결과",
             "type": "number",
             "required": False,
-            "default": "20",
+            "default": 20,
             "description": "기본값 20. 전체 사이트 결과를 합쳐 반환할 최대 개수.",
         },
         {
@@ -41,7 +47,7 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
             "label": "요청 제한 시간",
             "type": "number",
             "required": False,
-            "default": "10",
+            "default": 10,
             "description": "기본값 10초. 외부 사이트 응답 대기 시간.",
         },
         {
@@ -49,7 +55,7 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
             "label": "User-Agent",
             "type": "text",
             "required": False,
-            "default": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+            "default": DEFAULT_USER_AGENT,
             "description": "기본 브라우저 User-Agent. 차단 회피가 필요할 때만 변경.",
         },
         {
@@ -58,7 +64,7 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
             "type": "checkbox",
             "required": False,
             "default": False,
-            "description": "true면 검색어와 제목이 거의 같은 결과만 사용.",
+            "description": "사용하면 검색어와 제목이 거의 같은 결과만 표시합니다.",
         },
         {
             "key": "INCLUDE_ADULT",
@@ -66,7 +72,15 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
             "type": "checkbox",
             "required": False,
             "default": False,
-            "description": "true면 19세/성인 플래그가 있는 결과도 포함.",
+            "description": "사용하면 19세/성인 플래그가 있는 결과도 포함합니다.",
+        },
+        {
+            "key": "APPLY_COVER_TO_SERIES",
+            "label": "같은 시리즈 전체에 표지 적용",
+            "type": "checkbox",
+            "required": False,
+            "default": True,
+            "description": "사용하면 메타데이터 적용 시 같은 보관함·시리즈의 모든 권/화에 선택한 표지를 적용합니다.",
         },
         {
             "key": "NAVER_COOKIE",
@@ -102,44 +116,7 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
         },
     ]
 
-    SOURCE_ORDER = ("naver_webtoon", "naver_series", "kakao_webtoon", "kakaopage", "ridibooks")
-    SOURCE_META = {
-        "naver_webtoon": {
-            "label": "네이버웹툰",
-            "group": "naver",
-            "badge": "N",
-            "icon": "fa-solid fa-n",
-            "color": "#03c75a",
-        },
-        "naver_series": {
-            "label": "네이버시리즈",
-            "group": "naver",
-            "badge": "N",
-            "icon": "fa-solid fa-n",
-            "color": "#03c75a",
-        },
-        "kakao_webtoon": {
-            "label": "카카오웹툰",
-            "group": "kakao",
-            "badge": "K",
-            "icon": "fa-solid fa-k",
-            "color": "#fee500",
-        },
-        "kakaopage": {
-            "label": "카카오페이지",
-            "group": "kakao",
-            "badge": "K",
-            "icon": "fa-solid fa-k",
-            "color": "#fee500",
-        },
-        "ridibooks": {
-            "label": "리디",
-            "group": "ridi",
-            "badge": "R",
-            "icon": "fa-solid fa-r",
-            "color": "#1f8ce6",
-        },
-    }
+    SOURCE_ORDER = ("naver_webtoon", "naver_series", "kakao_webtoon", "kakaopage", "ridibooks", "novelpia")
     _cache = {}
 
     def search(self, db_type, query):
@@ -166,25 +143,48 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
                     results.extend(self._search_kakaopage(query, cfg))
                 elif source == "ridibooks":
                     results.extend(self._search_ridibooks(query, cfg))
+                elif source == "novelpia":
+                    results.extend(self._search_novelpia(query, cfg))
             except Exception as e:
-                print(f"[NaverKakaoRidiMetadataProvider] {source} search failed: {e}")
+                print(f"[NaverkakaoridiMetadataProvider] {source} search failed: {e}")
             if len(results) >= max_results:
                 break
 
         results = [r for r in results if (r.get("cover") or "").strip()]
         results = self._dedupe(results)
+        nq = self._normalize(query)
         if self._truthy(cfg.get("SEARCH_EXACT")):
-            nq = self._normalize(query)
             results = [r for r in results if self._normalize(r.get("title")) == nq]
-        return results[:max_results]
+        else:
+            results = [r for r in results if self._is_relevant(nq, r.get("title"))]
+        return [self._with_source_prefix(item) for item in results[:max_results]]
+
+    def _is_relevant(self, normalized_query, title):
+        if not normalized_query:
+            return True
+        nt = self._normalize(title)
+        if not nt:
+            return False
+        if normalized_query in nt or nt in normalized_query:
+            return True
+        return False
 
     def apply(self, db_type, book_id, item_data):
+        item_data = self._restore_original_title(item_data)
         gateway = self.get_db_gateway(db_type)
         try:
-            book = gateway.fetch_one("SELECT file_path, series_name, library_id FROM books WHERE id = ?", (book_id,))
+            book = gateway.fetch_one(
+                """
+                SELECT id, file_path, library_id, series_name
+                FROM books
+                WHERE id = ? AND COALESCE(is_deleted, 0) = 0
+                """,
+                (book_id,),
+            )
             if not book:
                 return False, "대상 도서를 찾을 수 없습니다."
 
+            cfg = self._get_config(db_type)
             cover_filename = self._save_cover(book, item_data.get("cover"))
             description = self._clean_text(item_data.get("description"))
             author = self._clean_text(item_data.get("author"))
@@ -194,36 +194,82 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
             tags = self._clean_text(item_data.get("tags"))
             score = self._clean_text(item_data.get("score"))
 
-            series_name = self._row_get(book, "series_name")
-            library_id = self._row_get(book, "library_id")
-            if series_name:
-                where_sql = "series_name = ? AND library_id = ?"
-                where_args = (series_name, library_id)
-            else:
-                where_sql = "id = ?"
-                where_args = (book_id,)
-
-            count_row = gateway.fetch_one(f"SELECT COUNT(*) AS cnt FROM books WHERE {where_sql}", where_args)
-            count = int((self._row_get(count_row, "cnt", 0) if count_row else 0) or 0)
-
-            gateway.execute(
-                f"""
-                UPDATE books
-                SET author = ?,
-                    publisher = ?,
-                    summary = ?,
-                    link = ?,
-                    genre = COALESCE(NULLIF(?, ''), genre),
-                    tags = COALESCE(NULLIF(?, ''), tags),
-                    score = COALESCE(NULLIF(?, ''), score),
-                    cover_image = COALESCE(NULLIF(?, ''), cover_image),
-                    cover_updated_at = CURRENT_TIMESTAMP
-                WHERE {where_sql}
-                """,
-                (author, publisher, description, link, genre, tags, score, cover_filename or "", *where_args),
+            raw_series_name = book["series_name"] or ""
+            series_cover_enabled = bool(
+                cover_filename
+                and self._clean_text(raw_series_name)
+                and book["library_id"] is not None
+                and self._truthy(cfg.get("APPLY_COVER_TO_SERIES"))
             )
-            title = item_data.get("title") or series_name or book_id
-            return True, f'"{title}" 메타데이터를 {count}개 항목에 반영했습니다.'
+            series_cover_updates = []
+            series_cover_failures = 0
+            if series_cover_enabled:
+                series_cover_updates, series_cover_failures = self._prepare_series_cover_files(
+                    gateway,
+                    book,
+                    raw_series_name,
+                )
+
+            series_cover_count = 0
+            with gateway.transaction() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    UPDATE books
+                    SET author = ?,
+                        publisher = ?,
+                        summary = ?,
+                        link = ?,
+                        genre = COALESCE(NULLIF(?, ''), genre),
+                        tags = COALESCE(NULLIF(?, ''), tags),
+                        score = COALESCE(NULLIF(?, ''), score),
+                        cover_image = COALESCE(NULLIF(?, ''), cover_image),
+                        cover_updated_at = CASE
+                            WHEN NULLIF(?, '') IS NOT NULL THEN CURRENT_TIMESTAMP
+                            ELSE cover_updated_at
+                        END
+                    WHERE id = ? AND COALESCE(is_deleted, 0) = 0
+                    """,
+                    (
+                        author,
+                        publisher,
+                        description,
+                        link,
+                        genre,
+                        tags,
+                        score,
+                        cover_filename or "",
+                        cover_filename or "",
+                        book_id,
+                    ),
+                )
+                count = cursor.rowcount
+                if count != 1:
+                    raise RuntimeError("대상 도서가 삭제되었거나 변경되어 메타데이터를 적용하지 못했습니다.")
+
+                if series_cover_updates:
+                    cursor.executemany(
+                        """
+                        UPDATE books
+                        SET cover_image = ?,
+                            cover_updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                          AND library_id = ?
+                          AND series_name = ?
+                          AND COALESCE(is_deleted, 0) = 0
+                        """,
+                        series_cover_updates,
+                    )
+                    series_cover_count = max(cursor.rowcount, 0)
+                    series_cover_failures += max(len(series_cover_updates) - series_cover_count, 0)
+
+            title = item_data.get("title") or book_id
+            message = f'"{title}" 메타데이터를 {count}개 항목에 반영했습니다.'
+            if series_cover_enabled:
+                message += f" 표지는 같은 시리즈 {series_cover_count + 1}권/화에 적용했습니다."
+                if series_cover_failures:
+                    message += f" {series_cover_failures}권/화의 표지 파일 복사에는 실패했습니다."
+            return True, message
         except Exception as e:
             return False, f"DB 업데이트 오류: {e}"
 
@@ -252,7 +298,7 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
                 tags = detail.get("curationTagList") or item.get("curationTagList") or []
                 results.append(
                     self._item(
-                        source_key="naver_webtoon",
+                        source="네이버웹툰",
                         title=detail.get("titleName") or title,
                         author=self._join_names(authors),
                         publisher="네이버웹툰",
@@ -305,7 +351,7 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
             author = self._clean_text(m.group(1))
         tags = ", ".join(re.findall(r"#([^\s#]+)", desc))
         return self._item(
-            source_key="naver_series",
+            source="네이버시리즈",
             title=title,
             author=author,
             publisher="네이버시리즈",
@@ -338,7 +384,7 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
             seo_id = urllib.parse.quote(str(merged.get("seoId") or title.replace(" ", "-")), safe="")
             results.append(
                 self._item(
-                    source_key="kakao_webtoon",
+                    source="카카오웹툰",
                     title=title,
                     author=self._kakao_author_text(merged.get("authors")),
                     publisher=self._kakao_publisher(merged.get("authors")) or "카카오웹툰",
@@ -390,7 +436,7 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
                 continue
             results.append(
                 self._item(
-                    source_key="kakaopage",
+                    source="카카오페이지",
                     title=title,
                     author=self._clean_text(merged.get("authors")),
                     publisher="카카오페이지",
@@ -446,7 +492,7 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
             thumbnail = (book.get("series") or {}).get("thumbnail") or book.get("thumbnail") or {}
             results.append(
                 self._item(
-                    source_key="ridibooks",
+                    source="리디",
                     title=title,
                     author=self._join_names(authors),
                     publisher=publication.get("name") or "리디",
@@ -461,61 +507,62 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
             )
         return results
 
-    def get_context_menu_items(self, db_type, context):
-        return [
-            {
-                "id": "open_naver_search",
-                "label": "네이버에서 제목 검색",
-                "icon": self.SOURCE_META["naver_webtoon"]["icon"],
-            },
-            {
-                "id": "open_kakao_search",
-                "label": "카카오에서 제목 검색",
-                "icon": self.SOURCE_META["kakao_webtoon"]["icon"],
-            },
-            {
-                "id": "open_ridi_search",
-                "label": "리디에서 제목 검색",
-                "icon": self.SOURCE_META["ridibooks"]["icon"],
-            },
-        ]
+    def _search_novelpia(self, query, cfg):
+        url = "https://novelpia.com/proc/novelsearch/" + urllib.parse.quote(query, safe="")
+        headers = {
+            "Accept": "application/json, text/plain, */*",
+            "Referer": "https://novelpia.com/",
+            "X-Requested-With": "XMLHttpRequest",
+            "Content-Type": "application/x-www-form-urlencoded",
+        }
+        body, response = self._request(url, cfg, headers=headers, method="POST", data=b"")
+        charset = response.headers.get_content_charset() or "utf-8"
+        try:
+            text = body.decode("utf-8")
+        except Exception:
+            text = body.decode(charset, errors="replace")
+        data = json.loads(text)
+        novel_list = ((data.get("data") or {}).get("search_result")) or []
 
-    def run_context_menu_action(self, db_type, action_id, context):
-        title = ((context or {}).get("book_title") or "").strip()
-        if not title:
-            return {"success": False, "error": "도서 제목 정보가 없어 검색을 실행할 수 없습니다."}
-
-        if action_id == "open_naver_search":
-            url = "https://search.naver.com/search.naver?" + urllib.parse.urlencode({"query": title})
-        elif action_id == "open_kakao_search":
-            url = "https://page.kakao.com/search/result?" + urllib.parse.urlencode({"keyword": title})
-        elif action_id == "open_ridi_search":
-            url = "https://ridibooks.com/search?" + urllib.parse.urlencode({"q": title})
-        else:
-            return {"success": False, "error": f"지원하지 않는 액션입니다: {action_id}"}
-
-        return {"success": True, "message": "검색 페이지를 새 탭으로 엽니다.", "open_url": url}
+        results = []
+        for item in novel_list[: self._int(cfg.get("MAX_RESULTS"), 20, 1, 100)]:
+            age = self._int(item.get("novel_age"), 0, 0, 99)
+            if age >= 15 and not self._truthy(cfg.get("INCLUDE_ADULT")):
+                continue
+            novel_no = item.get("novel_no")
+            title = self._clean_text(item.get("novel_name"))
+            if not novel_no or not title:
+                continue
+            thumb = item.get("novel_thumb_all") or item.get("novel_thumb") or ""
+            if thumb and thumb.startswith("/"):
+                thumb = "https://novelpia.com" + thumb
+            results.append(
+                self._item(
+                    source="노벨피아",
+                    title=title,
+                    author=self._clean_text(item.get("mem_nick")),
+                    publisher="노벨피아",
+                    cover=thumb,
+                    description="",
+                    link=f"https://novelpia.com/novel/{novel_no}",
+                    genre="",
+                    tags="",
+                    pub_date=self._clean_text(item.get("content_viewdate")),
+                    score="",
+                )
+            )
+        return results
 
     def _get_config(self, db_type):
         defaults = {f["key"]: f.get("default", "") for f in self.config_schema}
-        loaded = False
         try:
-            config = self.get_plugin_config(db_type, default={})
-            if isinstance(config, str):
-                config = json.loads(config)
-            if isinstance(config, dict) and config:
-                defaults.update(config)
-                loaded = True
+            stored = self.get_plugin_config(db_type, default={})
+            if not stored:
+                stored = self.get_db_gateway(db_type).get_plugin_config(LEGACY_PLUGIN_ID, default={})
+            if isinstance(stored, dict):
+                defaults.update(stored)
         except Exception as e:
-            print(f"[NaverKakaoRidiMetadataProvider] config load failed: {e}")
-
-        if not loaded:
-            try:
-                value = self.get_db_gateway(db_type).get_setting(f"PLUGIN_CONFIG_{self.legacy_id}", None)
-                if value:
-                    defaults.update(json.loads(value))
-            except Exception:
-                pass
+            print(f"[NaverkakaoridiMetadataProvider] config load failed: {e}")
         return defaults
 
     def _get_json(self, url, cfg, headers=None):
@@ -539,16 +586,17 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
                 pass
         return body.decode("utf-8", errors="replace")
 
-    def _request(self, url, cfg, headers=None):
+    def _request(self, url, cfg, headers=None, method=None, data=None):
         ttl = 60
-        key = (url, tuple(sorted((headers or {}).items())))
-        cached = self._cache.get(key)
-        if cached and time.time() - cached[0] < ttl:
-            return cached[1], cached[2]
+        key = (url, tuple(sorted((headers or {}).items())), method or "GET", data or b"")
+        if method in (None, "GET"):
+            cached = self._cache.get(key)
+            if cached and time.time() - cached[0] < ttl:
+                return cached[1], cached[2]
 
-        merged_headers = {"User-Agent": cfg.get("USER_AGENT") or self.config_schema[3]["default"]}
+        merged_headers = {"User-Agent": cfg.get("USER_AGENT") or DEFAULT_USER_AGENT}
         merged_headers.update(headers or {})
-        req = urllib.request.Request(url, headers=merged_headers)
+        req = urllib.request.Request(url, headers=merged_headers, method=method, data=data)
         try:
             response = urllib.request.urlopen(req, timeout=self._int(cfg.get("TIMEOUT"), 10, 1, 60))
             body = response.read()
@@ -562,17 +610,10 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
         if not cover_url:
             return None
         try:
-            library_id = self._row_get(book, "library_id")
-            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-            covers_dir = os.path.join(base_dir, "covers", str(library_id))
-            os.makedirs(covers_dir, exist_ok=True)
+            dest_path, cover_filename = self._cover_location(book["library_id"], book["file_path"])
+            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
 
-            name_source = self._row_get(book, "series_name") or os.path.basename(self._row_get(book, "file_path", ""))
-            book_hash = hashlib.md5(name_source.encode("utf-8")).hexdigest()
-            filename = f"book_{book_hash}.webp"
-            dest_path = os.path.join(covers_dir, filename)
-
-            req = urllib.request.Request(cover_url, headers={"User-Agent": self.config_schema[3]["default"]})
+            req = urllib.request.Request(cover_url, headers={"User-Agent": DEFAULT_USER_AGENT})
             with urllib.request.urlopen(req, timeout=10) as response:
                 img_data = response.read()
             try:
@@ -581,13 +622,67 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
             except Exception:
                 with open(dest_path, "wb") as f:
                     f.write(img_data)
-            return f"{library_id}/{filename}"
+            return cover_filename
         except Exception as e:
-            print(f"[NaverKakaoRidiMetadataProvider] cover download failed: {e}")
+            print(f"[NaverkakaoridiMetadataProvider] cover download failed: {e}")
             return None
 
-    def _item(self, source_key, title, author, publisher, cover, description, link, genre, tags, pub_date, score):
-        source_meta = self.SOURCE_META.get(source_key, {})
+    def _prepare_series_cover_files(self, gateway, book, series_name):
+        series_books = gateway.fetch_all(
+            """
+            SELECT id, file_path
+            FROM books
+            WHERE library_id = ?
+              AND series_name = ?
+              AND id != ?
+              AND COALESCE(is_deleted, 0) = 0
+            """,
+            (book["library_id"], series_name, book["id"]),
+        )
+        if not series_books:
+            return [], 0
+
+        source_path, _ = self._cover_location(book["library_id"], book["file_path"])
+        if not os.path.isfile(source_path):
+            print(f"[NaverkakaoridiMetadataProvider] source cover file missing: {source_path}")
+            return [], len(series_books)
+
+        updates = []
+        failures = 0
+        for series_book in series_books:
+            try:
+                dest_path, cover_filename = self._cover_location(
+                    book["library_id"],
+                    series_book["file_path"],
+                )
+                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                shutil.copyfile(source_path, dest_path)
+                updates.append(
+                    (
+                        cover_filename,
+                        series_book["id"],
+                        book["library_id"],
+                        series_name,
+                    )
+                )
+            except Exception as e:
+                failures += 1
+                print(
+                    "[NaverkakaoridiMetadataProvider] "
+                    f"series cover copy failed (book_id={series_book['id']}): {e}"
+                )
+        return updates, failures
+
+    def _cover_location(self, library_id, file_path):
+        if not file_path:
+            raise ValueError("표지 파일명을 생성할 도서 경로가 없습니다.")
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        book_hash = hashlib.md5(str(file_path).encode("utf-8")).hexdigest()
+        filename = f"book_{book_hash}.webp"
+        relative_path = f"{library_id}/{filename}"
+        return os.path.join(base_dir, "covers", str(library_id), filename), relative_path
+
+    def _item(self, source, title, author, publisher, cover, description, link, genre, tags, pub_date, score):
         return {
             "title": self._clean_text(title),
             "author": self._clean_text(author),
@@ -599,19 +694,31 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
             "genre": self._clean_text(genre),
             "tags": self._clean_text(tags),
             "score": self._clean_text(score),
-            "source": source_meta.get("label", source_key),
-            "sourceKey": source_meta.get("group", source_key),
-            "sourceLabel": source_meta.get("label", source_key),
-            "sourceIcon": source_meta.get("badge", ""),
-            "sourceIconClass": source_meta.get("icon", ""),
-            "sourceColor": source_meta.get("color", ""),
+            "source": source,
         }
 
-    def _row_get(self, row, key, default=None):
-        try:
-            return row[key]
-        except Exception:
-            return getattr(row, key, default)
+    def _with_source_prefix(self, item):
+        result = dict(item)
+        source = self._clean_text(result.get("source"))
+        title = self._clean_text(result.get("title"))
+        result["raw_title"] = title
+        prefix = f"[{source}]" if source else ""
+        if prefix and title and not title.startswith(prefix):
+            result["title"] = f"{prefix} {title}"
+        return result
+
+    def _restore_original_title(self, item):
+        result = dict(item or {})
+        original_title = self._clean_text(result.pop("raw_title", ""))
+        if not original_title:
+            original_title = self._clean_text(result.pop("_original_title", ""))
+        if not original_title:
+            title = self._clean_text(result.get("title"))
+            source = self._clean_text(result.get("source"))
+            prefix = f"[{source}]" if source else ""
+            original_title = title[len(prefix):].lstrip() if prefix and title.startswith(prefix) else title
+        result["title"] = original_title
+        return result
 
     def _naver_headers(self, cfg, referer):
         headers = {"Accept": "application/json, text/html;q=0.9,*/*;q=0.8", "Referer": referer}
@@ -624,7 +731,7 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
             "Accept": "application/json, text/plain, */*",
             "Origin": "https://page.kakao.com",
             "Referer": "https://page.kakao.com/search/result?" + urllib.parse.urlencode({"keyword": query}),
-            "User-Agent": (cfg.get("USER_AGENT") or self.config_schema[3]["default"]) + " KakaoPageWeb/ssr",
+            "User-Agent": (cfg.get("USER_AGENT") or DEFAULT_USER_AGENT) + " KakaoPageWeb/ssr",
         }
         if cfg.get("KAKAO_COOKIE"):
             headers["Cookie"] = cfg.get("KAKAO_COOKIE")
@@ -792,6 +899,7 @@ class NaverKakaoRidiMetadataProvider(BaseMetadataProvider):
             "page": "kakaopage",
             "ridi": "ridibooks",
             "ridibooks": "ridibooks",
+            "novelpia": "novelpia",
         }
         return {aliases.get(v, v) for v in raw if aliases.get(v, v) in self.SOURCE_ORDER}
 
