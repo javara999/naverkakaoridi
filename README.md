@@ -8,15 +8,15 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 플러그인 버전 | `1.1.0` |
+| 플러그인 버전 | `1.2.0` |
 | 플러그인 ID | `naverkakaoridi` |
 | 이전 플러그인 ID | `naverkakaoridi_meta` |
 | 클래스 | `NaverkakaoridiMetadataProvider` |
 | 모듈 | `plugins.metadata.naverkakaoridi.naverkakaoridi` |
 | 유형 | 검색형 메타데이터 제공자 |
-| 확인한 BookOasis 버전 | Dashboard `1.0.1`, Extensions `1.0.2` |
-| 확인한 BookOasis 커밋 | `26126ef` |
-| 문서 작성일 | `2026-07-15` |
+| 확인한 BookOasis 버전 | `1.2.1` |
+| 확인한 BookOasis 커밋 | `4f204be` |
+| 문서 작성일 | `2026-07-20` |
 
 이 버전은 BookOasis의 권장 폴더형 플러그인 구조와 DB Gateway 규격을 사용합니다. BookOasis 코어 파일을 수정하지 않습니다.
 
@@ -68,6 +68,7 @@ Cookie 입력란은 화면에서 비밀번호 형식으로 가려지지만 BookO
 | --- | --- |
 | `source` | 사용자에게 표시할 출처 이름 |
 | `raw_title` | `[출처]`가 붙지 않은 원래 제목 |
+| `isbn` | 원본 검색 결과가 제공하는 ISBN |
 | `genre` | 장르 |
 | `tags` | 태그 |
 | `score` | 원본 소스의 평점 |
@@ -101,6 +102,13 @@ plugins/metadata/naverkakaoridi/
 - 외부 서비스별 요청 오류는 해당 소스 결과만 제외하고 다른 소스 검색은 계속 진행합니다.
 
 ## 변경 이력
+
+### 1.2.0 - 2026-07-20
+
+- BookOasis 1.2.1 `books` 스키마의 `isbn`, `release_date`, `metadata_locked` 반영
+- 빈 ISBN·출간일은 기존 DB 값을 유지하도록 처리
+- WebP 변환 실패 시 원본 바이트를 `.webp` 파일로 저장하지 않도록 수정
+- 네이버·카카오 상세 조회를 최대 4개 병렬 처리하고, 중복·무관 결과를 상세 조회 전에 제외
 
 ### 1.1.0 - 2026-07-15
 

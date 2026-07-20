@@ -6,18 +6,21 @@ import json
 import os
 import re
 import shutil
+import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 from PIL import Image
 from plugins.metadata.base import BaseMetadataProvider
 
 
-PLUGIN_VERSION = "1.1.0"
+PLUGIN_VERSION = "1.2.0"
 LEGACY_PLUGIN_ID = "naverkakaoridi_meta"
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
+DETAIL_WORKERS = 4
 
 
 class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
@@ -118,6 +121,7 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
 
     SOURCE_ORDER = ("naver_webtoon", "naver_series", "kakao_webtoon", "kakaopage", "ridibooks", "novelpia")
     _cache = {}
+    _cache_lock = threading.Lock()
 
     def search(self, db_type, query):
         query = (query or "").strip()
@@ -169,6 +173,30 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             return True
         return False
 
+    def _matches_candidate_title(self, normalized_query, title, cfg):
+        if not title:
+            return True
+        if self._truthy(cfg.get("SEARCH_EXACT")):
+            return self._normalize(title) == normalized_query
+        return self._is_relevant(normalized_query, title)
+
+    def _parallel_map(self, func, values):
+        values = list(values)
+        if not values:
+            return []
+
+        def safe_call(value):
+            try:
+                return func(value) or {}
+            except Exception as e:
+                print(f"[NaverkakaoridiMetadataProvider] detail request failed: {e}")
+                return {}
+
+        if len(values) == 1:
+            return [safe_call(values[0])]
+        with ThreadPoolExecutor(max_workers=min(DETAIL_WORKERS, len(values))) as executor:
+            return list(executor.map(safe_call, values))
+
     def apply(self, db_type, book_id, item_data):
         item_data = self._restore_original_title(item_data)
         gateway = self.get_db_gateway(db_type)
@@ -189,6 +217,10 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             description = self._clean_text(item_data.get("description"))
             author = self._clean_text(item_data.get("author"))
             publisher = self._clean_text(item_data.get("publisher"))
+            isbn = self._clean_text(
+                item_data.get("isbn") or item_data.get("isbn13") or item_data.get("isbn_13")
+            )
+            release_date = self._clean_text(item_data.get("pubDate") or item_data.get("release_date"))
             link = item_data.get("link") or ""
             genre = self._clean_text(item_data.get("genre"))
             tags = self._clean_text(item_data.get("tags"))
@@ -217,9 +249,11 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
                     """
                     UPDATE books
                     SET author = ?,
+                        isbn = COALESCE(NULLIF(?, ''), isbn),
                         publisher = ?,
                         summary = ?,
                         link = ?,
+                        release_date = COALESCE(NULLIF(?, ''), release_date),
                         genre = COALESCE(NULLIF(?, ''), genre),
                         tags = COALESCE(NULLIF(?, ''), tags),
                         score = COALESCE(NULLIF(?, ''), score),
@@ -227,14 +261,17 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
                         cover_updated_at = CASE
                             WHEN NULLIF(?, '') IS NOT NULL THEN CURRENT_TIMESTAMP
                             ELSE cover_updated_at
-                        END
+                        END,
+                        metadata_locked = 1
                     WHERE id = ? AND COALESCE(is_deleted, 0) = 0
                     """,
                     (
                         author,
+                        isbn,
                         publisher,
                         description,
                         link,
+                        release_date,
                         genre,
                         tags,
                         score,
@@ -282,7 +319,10 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             "searchChallengeResult",
             "searchNbooksComicResult",
         )
-        results = []
+        max_results = self._int(cfg.get("MAX_RESULTS"), 20, 1, 100)
+        normalized_query = self._normalize(query)
+        candidates = []
+        seen_ids = set()
         for group in groups:
             for item in self._as_list(data.get(group)):
                 title_id = item.get("titleId") or item.get("contentId") or item.get("id")
@@ -291,26 +331,42 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
                     continue
                 if self._is_adult(item) and not self._truthy(cfg.get("INCLUDE_ADULT")):
                     continue
+                if not self._matches_candidate_title(normalized_query, title, cfg):
+                    continue
+                title_key = str(title_id)
+                if title_key in seen_ids:
+                    continue
+                seen_ids.add(title_key)
+                candidates.append((item, title_id, title))
+                if len(candidates) >= max_results:
+                    break
+            if len(candidates) >= max_results:
+                break
 
-                detail = self._naver_webtoon_detail(title_id, cfg) or {}
-                authors = detail.get("communityArtists") or item.get("communityArtists") or []
-                genre_list = detail.get("genreList") or item.get("genreList") or []
-                tags = detail.get("curationTagList") or item.get("curationTagList") or []
-                results.append(
-                    self._item(
-                        source="네이버웹툰",
-                        title=detail.get("titleName") or title,
-                        author=self._join_names(authors),
-                        publisher="네이버웹툰",
-                        cover=detail.get("thumbnailUrl") or item.get("thumbnailUrl"),
-                        description=detail.get("synopsis") or item.get("synopsis") or "",
-                        link=f"https://comic.naver.com/webtoon/list?titleId={title_id}",
-                        genre=self._join_names(genre_list),
-                        tags=self._join_names(tags),
-                        pub_date="",
-                        score=str(detail.get("starScore") or ""),
-                    )
+        details = self._parallel_map(
+            lambda candidate: self._naver_webtoon_detail(candidate[1], cfg),
+            candidates,
+        )
+        results = []
+        for (item, title_id, title), detail in zip(candidates, details):
+            authors = detail.get("communityArtists") or item.get("communityArtists") or []
+            genre_list = detail.get("genreList") or item.get("genreList") or []
+            tags = detail.get("curationTagList") or item.get("curationTagList") or []
+            results.append(
+                self._item(
+                    source="네이버웹툰",
+                    title=detail.get("titleName") or title,
+                    author=self._join_names(authors),
+                    publisher="네이버웹툰",
+                    cover=detail.get("thumbnailUrl") or item.get("thumbnailUrl"),
+                    description=detail.get("synopsis") or item.get("synopsis") or "",
+                    link=f"https://comic.naver.com/webtoon/list?titleId={title_id}",
+                    genre=self._join_names(genre_list),
+                    tags=self._join_names(tags),
+                    pub_date="",
+                    score=str(detail.get("starScore") or ""),
                 )
+            )
         return results
 
     def _naver_webtoon_detail(self, title_id, cfg):
@@ -330,8 +386,12 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
                 product_nos.append(m.group(1))
 
         results = []
-        for product_no in product_nos[: self._int(cfg.get("MAX_RESULTS"), 20, 1, 100)]:
-            item = self._naver_series_detail(product_no, cfg)
+        product_nos = product_nos[: self._int(cfg.get("MAX_RESULTS"), 20, 1, 100)]
+        details = self._parallel_map(
+            lambda product_no: self._naver_series_detail(product_no, cfg),
+            product_nos,
+        )
+        for item in details:
             if item:
                 results.append(item)
         return results
@@ -370,12 +430,31 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
         data = self._get_json(url, cfg, headers=self._kakao_webtoon_headers(cfg, query))
         contents = ((data.get("data") or {}).get("content")) or []
 
-        results = []
+        normalized_query = self._normalize(query)
+        candidates = []
+        max_results = self._int(cfg.get("MAX_RESULTS"), 20, 1, 100)
+        seen_ids = set()
         for item in contents:
             if item.get("adult") and not self._truthy(cfg.get("INCLUDE_ADULT")):
                 continue
             content_id = item.get("id") or item.get("contentId")
-            detail = self._kakao_webtoon_detail(content_id, cfg) if content_id else {}
+            title = self._clean_text(item.get("title"))
+            if not content_id or not self._matches_candidate_title(normalized_query, title, cfg):
+                continue
+            content_key = str(content_id)
+            if content_key in seen_ids:
+                continue
+            seen_ids.add(content_key)
+            candidates.append((item, content_id))
+            if len(candidates) >= max_results:
+                break
+
+        details = self._parallel_map(
+            lambda candidate: self._kakao_webtoon_detail(candidate[1], cfg),
+            candidates,
+        )
+        results = []
+        for (item, content_id), detail in zip(candidates, details):
             merged = dict(item)
             merged.update(detail)
             title = self._clean_text(merged.get("title"))
@@ -423,12 +502,31 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
         data = self._get_json(url, cfg, headers=self._kakaopage_headers(cfg, query))
         items = ((data.get("result") or {}).get("list")) or []
 
-        results = []
+        normalized_query = self._normalize(query)
+        candidates = []
+        max_results = self._int(cfg.get("MAX_RESULTS"), 20, 1, 100)
+        seen_ids = set()
         for item in items:
             if self._is_kakaopage_adult(item) and not self._truthy(cfg.get("INCLUDE_ADULT")):
                 continue
             series_id = item.get("series_id") or item.get("id")
-            detail = self._kakaopage_detail(series_id, cfg) if series_id else {}
+            title = self._clean_text(item.get("title"))
+            if not series_id or not self._matches_candidate_title(normalized_query, title, cfg):
+                continue
+            series_key = str(series_id)
+            if series_key in seen_ids:
+                continue
+            seen_ids.add(series_key)
+            candidates.append((item, series_id))
+            if len(candidates) >= max_results:
+                break
+
+        details = self._parallel_map(
+            lambda candidate: self._kakaopage_detail(candidate[1], cfg),
+            candidates,
+        )
+        results = []
+        for (item, series_id), detail in zip(candidates, details):
             merged = dict(item)
             merged.update(detail)
             title = self._clean_text(merged.get("title"))
@@ -590,17 +688,21 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
         ttl = 60
         key = (url, tuple(sorted((headers or {}).items())), method or "GET", data or b"")
         if method in (None, "GET"):
-            cached = self._cache.get(key)
-            if cached and time.time() - cached[0] < ttl:
-                return cached[1], cached[2]
+            with self._cache_lock:
+                cached = self._cache.get(key)
+                if cached and time.time() - cached[0] < ttl:
+                    return cached[1], cached[2]
+                if cached:
+                    self._cache.pop(key, None)
 
         merged_headers = {"User-Agent": cfg.get("USER_AGENT") or DEFAULT_USER_AGENT}
         merged_headers.update(headers or {})
         req = urllib.request.Request(url, headers=merged_headers, method=method, data=data)
         try:
-            response = urllib.request.urlopen(req, timeout=self._int(cfg.get("TIMEOUT"), 10, 1, 60))
-            body = response.read()
-            self._cache[key] = (time.time(), body, response)
+            with urllib.request.urlopen(req, timeout=self._int(cfg.get("TIMEOUT"), 10, 1, 60)) as response:
+                body = response.read()
+            with self._cache_lock:
+                self._cache[key] = (time.time(), body, response)
             return body, response
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", errors="replace")[:300]
@@ -616,12 +718,8 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             req = urllib.request.Request(cover_url, headers={"User-Agent": DEFAULT_USER_AGENT})
             with urllib.request.urlopen(req, timeout=10) as response:
                 img_data = response.read()
-            try:
-                with Image.open(io.BytesIO(img_data)) as img:
-                    img.save(dest_path, "WEBP", quality=82)
-            except Exception:
-                with open(dest_path, "wb") as f:
-                    f.write(img_data)
+            with Image.open(io.BytesIO(img_data)) as img:
+                img.save(dest_path, "WEBP", quality=82)
             return cover_filename
         except Exception as e:
             print(f"[NaverkakaoridiMetadataProvider] cover download failed: {e}")
@@ -682,11 +780,12 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
         relative_path = f"{library_id}/{filename}"
         return os.path.join(base_dir, "covers", str(library_id), filename), relative_path
 
-    def _item(self, source, title, author, publisher, cover, description, link, genre, tags, pub_date, score):
+    def _item(self, source, title, author, publisher, cover, description, link, genre, tags, pub_date, score, isbn=""):
         return {
             "title": self._clean_text(title),
             "author": self._clean_text(author),
             "publisher": self._clean_text(publisher),
+            "isbn": self._clean_text(isbn),
             "pubDate": self._clean_text(pub_date),
             "cover": cover or "",
             "description": self._clean_text(description),
