@@ -17,7 +17,7 @@ from PIL import Image
 from plugins.metadata.base import BaseMetadataProvider
 
 
-PLUGIN_VERSION = "1.2.1"
+PLUGIN_VERSION = "1.2.0"
 LEGACY_PLUGIN_ID = "naverkakaoridi_meta"
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
 DETAIL_WORKERS = 4
@@ -122,71 +122,6 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
     SOURCE_ORDER = ("naver_webtoon", "naver_series", "kakao_webtoon", "kakaopage", "ridibooks", "novelpia")
     _cache = {}
     _cache_lock = threading.Lock()
-
-    def get_context_menu_items(self, db_type, context):
-        return [
-            {
-                "id": "open_naver_search",
-                "label": "네이버에서 제목 검색",
-                "icon": "fa-solid fa-n",
-            },
-            {
-                "id": "open_kakao_search",
-                "label": "카카오에서 제목 검색",
-                "icon": "fa-solid fa-comment",
-            },
-            {
-                "id": "open_ridi_search",
-                "label": "리디에서 제목 검색",
-                "icon": "fa-solid fa-book-open",
-            },
-        ]
-
-    def run_context_menu_action(self, db_type, action_id, context):
-        supported_actions = {
-            "open_naver_search": (
-                "네이버",
-                "https://series.naver.com/search/search.series?",
-                {"t": "all", "fs": "all", "q": None},
-            ),
-            "open_kakao_search": (
-                "카카오",
-                "https://page.kakao.com/search/result?",
-                {"keyword": None},
-            ),
-            "open_ridi_search": (
-                "리디",
-                "https://ridibooks.com/search?",
-                {"q": None},
-            ),
-        }
-        if action_id not in supported_actions:
-            return {"success": False, "error": f"지원하지 않는 액션입니다: {action_id}"}
-
-        context = context or {}
-        book_id = context.get("book_id")
-        title = self._clean_text(context.get("book_title"))
-        if book_id:
-            try:
-                row = self.get_db_gateway(db_type).fetch_one(
-                    "SELECT title FROM books WHERE id = ? AND COALESCE(is_deleted, 0) = 0",
-                    (book_id,),
-                )
-                if row and row["title"]:
-                    title = self._clean_text(row["title"])
-            except Exception as e:
-                print(f"[NaverkakaoridiMetadataProvider] context title lookup failed: {e}")
-
-        if not title:
-            return {"success": False, "error": "검색할 작품 제목 정보가 없습니다."}
-
-        source_name, base_url, params = supported_actions[action_id]
-        params = {key: title if value is None else value for key, value in params.items()}
-        return {
-            "success": True,
-            "message": f"{source_name} 검색 페이지를 새 탭으로 엽니다.",
-            "open_url": base_url + urllib.parse.urlencode(params),
-        }
 
     def search(self, db_type, query):
         query = (query or "").strip()

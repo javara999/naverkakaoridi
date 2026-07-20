@@ -8,7 +8,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 플러그인 버전 | `1.2.1` |
+| 플러그인 버전 | `1.2.0` |
 | 플러그인 ID | `naverkakaoridi` |
 | 이전 플러그인 ID | `naverkakaoridi_meta` |
 | 클래스 | `NaverkakaoridiMetadataProvider` |
@@ -102,11 +102,6 @@ plugins/metadata/naverkakaoridi/
 - 외부 서비스별 요청 오류는 해당 소스 결과만 제외하고 다른 소스 검색은 계속 진행합니다.
 
 ## 변경 이력
-
-### 1.2.1 - 2026-07-20
-
-- BookOasis 도서 우클릭 메뉴에 플러그인 그룹 추가
-- BookOasis 코어 수정 없이 현재 작품 제목으로 네이버·카카오·리디 검색 페이지를 여는 액션 제공
 
 ### 1.2.0 - 2026-07-20
 
