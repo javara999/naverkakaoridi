@@ -17,7 +17,7 @@ from PIL import Image
 from plugins.metadata.base import BaseMetadataProvider
 
 
-PLUGIN_VERSION = "1.3.0"
+PLUGIN_VERSION = "1.3.1"
 LEGACY_PLUGIN_ID = "naverkakaoridi_meta"
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
 DETAIL_WORKERS = 4
@@ -91,6 +91,14 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             "required": False,
             "default": True,
             "description": "사용하면 메타데이터 적용 시 같은 보관함·시리즈의 모든 권/화에 선택한 표지를 적용합니다.",
+        },
+        {
+            "key": "APPLY_RATING_TO_SERIES",
+            "label": "같은 시리즈 전체에 평점 적용",
+            "type": "checkbox",
+            "required": False,
+            "default": True,
+            "description": "사용하면 같은 보관함·시리즈의 모든 권/화에 평점과 평점 출처를 적용합니다.",
         },
         {
             "key": "NAVER_COOKIE",
@@ -232,6 +240,7 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             genre = self._clean_text(item_data.get("genre"))
             tags = self._clean_text(item_data.get("tags"))
             score = self._clean_text(item_data.get("score"))
+            rating_label = self._clean_text(item_data.get("rating_label"))
 
             raw_series_name = book["series_name"] or ""
             series_cover_enabled = bool(
@@ -248,6 +257,37 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
                     book,
                     raw_series_name,
                 )
+
+            series_rating_enabled = bool(
+                score
+                and rating_label
+                and self._clean_text(raw_series_name)
+                and book["library_id"] is not None
+                and self._truthy(cfg.get("APPLY_RATING_TO_SERIES", True))
+            )
+            series_rating_updates = []
+            if series_rating_enabled:
+                series_books = gateway.fetch_all(
+                    """
+                    SELECT id, summary
+                    FROM books
+                    WHERE library_id = ?
+                      AND series_name = ?
+                      AND id != ?
+                      AND COALESCE(is_deleted, 0) = 0
+                    """,
+                    (book["library_id"], raw_series_name, book_id),
+                )
+                series_rating_updates = [
+                    (
+                        score,
+                        self._with_rating_label(series_book["summary"] or "", rating_label),
+                        series_book["id"],
+                        book["library_id"],
+                        raw_series_name,
+                    )
+                    for series_book in series_books
+                ]
 
             series_cover_count = 0
             with gateway.transaction() as conn:
@@ -307,12 +347,27 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
                     series_cover_count = max(cursor.rowcount, 0)
                     series_cover_failures += max(len(series_cover_updates) - series_cover_count, 0)
 
+                if series_rating_updates:
+                    cursor.executemany(
+                        """
+                        UPDATE books
+                        SET score = ?, summary = ?, metadata_locked = 1
+                        WHERE id = ?
+                          AND library_id = ?
+                          AND series_name = ?
+                          AND COALESCE(is_deleted, 0) = 0
+                        """,
+                        series_rating_updates,
+                    )
+
             title = item_data.get("title") or book_id
             message = f'"{title}" 메타데이터를 {count}개 항목에 반영했습니다.'
             if series_cover_enabled:
                 message += f" 표지는 같은 시리즈 {series_cover_count + 1}권/화에 적용했습니다."
                 if series_cover_failures:
                     message += f" {series_cover_failures}권/화의 표지 파일 복사에는 실패했습니다."
+            if series_rating_enabled:
+                message += f" 평점은 같은 시리즈 {len(series_rating_updates) + 1}권/화에 적용했습니다."
             return True, message
         except Exception as e:
             return False, f"DB 업데이트 오류: {e}"
@@ -814,7 +869,7 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
         rating = self._rating_metadata(source, score)
         if rating:
             rating_label = f"[평점: {rating['value']:g}/{rating['scale']} | 출처: {source}]"
-            description = f"{rating_label} {description}".strip()
+            description = self._with_rating_label(description, rating_label)
 
         item = {
             "title": self._clean_text(title),
@@ -836,9 +891,15 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
                     "rating_value": rating["value"],
                     "rating_scale": rating["scale"],
                     "rating_source": source,
+                    "rating_label": rating_label,
                 }
             )
         return item
+
+    @staticmethod
+    def _with_rating_label(description, rating_label):
+        text = re.sub(r"^\[평점:\s*[^\]]+\]\s*", "", str(description or "")).strip()
+        return f"{rating_label} {text}".strip()
 
     def _rating_metadata(self, source, value):
         scale = RATING_SCALES.get(self._clean_text(source))

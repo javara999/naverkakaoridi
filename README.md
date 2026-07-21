@@ -8,7 +8,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 플러그인 버전 | `1.3.0` |
+| 플러그인 버전 | `1.3.1` |
 | 플러그인 ID | `naverkakaoridi` |
 | 이전 플러그인 ID | `naverkakaoridi_meta` |
 | 클래스 | `NaverkakaoridiMetadataProvider` |
@@ -53,6 +53,7 @@
 | `SEARCH_EXACT` | checkbox | `false` | 정규화한 제목이 검색어와 같은 결과만 표시 |
 | `INCLUDE_ADULT` | checkbox | `false` | 성인 플래그가 있는 결과 포함 |
 | `APPLY_COVER_TO_SERIES` | checkbox | `true` | 같은 보관함·시리즈의 모든 권/화에 선택한 표지 적용 |
+| `APPLY_RATING_TO_SERIES` | checkbox | `true` | 같은 보관함·시리즈의 모든 권/화에 평점과 평점 출처 적용 |
 | `NAVER_COOKIE` | password | 빈 값 | 네이버 로그인/연령 제한용 Cookie |
 | `KAKAO_COOKIE` | password | 빈 값 | 카카오 로그인/연령 제한용 Cookie |
 | `RIDI_COOKIE` | password | 빈 값 | 리디 로그인/연령 제한용 Cookie |
@@ -102,6 +103,12 @@ plugins/metadata/naverkakaoridi/
 - 외부 서비스별 요청 오류는 해당 소스 결과만 제외하고 다른 소스 검색은 계속 진행합니다.
 
 ## 변경 이력
+
+### 1.3.1 - 2026-07-21
+
+- 라이브러리 우클릭 메타 검색에서도 대표 권과 관계없이 보이도록 같은 시리즈 전체에 평점 적용
+- 다른 권의 기존 작품 설명은 보존하고 평점 출처 라벨만 교체·추가
+- `APPLY_RATING_TO_SERIES` 설정 추가
 
 ### 1.3.0 - 2026-07-21
 
