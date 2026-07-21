@@ -17,10 +17,11 @@ from PIL import Image
 from plugins.metadata.base import BaseMetadataProvider
 
 
-PLUGIN_VERSION = "1.4.0"
+PLUGIN_VERSION = "1.4.1"
 LEGACY_PLUGIN_ID = "naverkakaoridi_meta"
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
 DETAIL_WORKERS = 4
+NOVELPIA_FAILURE_COOLDOWN = 300
 RATING_SCALES = {
     "네이버웹툰": 10,
     "네이버시리즈": 10,
@@ -75,6 +76,14 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             "required": False,
             "default": "",
             "description": "선택 사항. http://host:port 또는 http://user:password@host:port 형식. 검색과 표지 다운로드에 함께 적용됩니다.",
+        },
+        {
+            "key": "NOVELPIA_TIMEOUT",
+            "label": "노벨피아 제한 시간(초)",
+            "type": "number",
+            "required": False,
+            "default": 3,
+            "description": "기본값 3초. 시간 초과 시 5분 동안 노벨피아 요청만 건너뜁니다.",
         },
         {
             "key": "SEARCH_EXACT",
@@ -145,6 +154,7 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
     SOURCE_ORDER = ("naver_webtoon", "naver_series", "kakao_webtoon", "kakaopage", "ridibooks", "novelpia")
     _cache = {}
     _cache_lock = threading.Lock()
+    _source_cooldowns = {}
 
     def search(self, db_type, query):
         query = (query or "").strip()
@@ -698,6 +708,13 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
         return results
 
     def _search_novelpia(self, query, cfg):
+        proxy_url = self._proxy_url(cfg)
+        cooldown_key = ("novelpia", hashlib.sha256(proxy_url.encode("utf-8")).hexdigest())
+        with self._cache_lock:
+            cooldown_until = self._source_cooldowns.get(cooldown_key, 0)
+        if cooldown_until > time.time():
+            return []
+
         url = "https://novelpia.com/proc/novelsearch/" + urllib.parse.quote(query, safe="")
         headers = {
             "Accept": "application/json, text/plain, */*",
@@ -705,7 +722,19 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             "X-Requested-With": "XMLHttpRequest",
             "Content-Type": "application/x-www-form-urlencoded",
         }
-        body, response = self._request(url, cfg, headers=headers, method="POST", data=b"")
+        try:
+            body, response = self._request(
+                url,
+                cfg,
+                headers=headers,
+                method="POST",
+                data=b"",
+                timeout=self._int(cfg.get("NOVELPIA_TIMEOUT"), 3, 1, 15),
+            )
+        except (TimeoutError, urllib.error.URLError) as e:
+            with self._cache_lock:
+                self._source_cooldowns[cooldown_key] = time.time() + NOVELPIA_FAILURE_COOLDOWN
+            raise RuntimeError("request timed out; skipping Novelpia for 5 minutes") from e
         charset = response.headers.get_content_charset() or "utf-8"
         try:
             text = body.decode("utf-8")
@@ -776,7 +805,7 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
                 pass
         return body.decode("utf-8", errors="replace")
 
-    def _request(self, url, cfg, headers=None, method=None, data=None):
+    def _request(self, url, cfg, headers=None, method=None, data=None, timeout=None):
         ttl = 60
         proxy_url = self._proxy_url(cfg)
         proxy_key = hashlib.sha256(proxy_url.encode("utf-8")).hexdigest() if proxy_url else ""
@@ -793,8 +822,9 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
         merged_headers.update(headers or {})
         req = urllib.request.Request(url, headers=merged_headers, method=method, data=data)
         try:
-            timeout = self._int(cfg.get("TIMEOUT"), 10, 1, 60)
-            with self._urlopen(req, cfg, timeout=timeout) as response:
+            timeout_value = timeout if timeout is not None else cfg.get("TIMEOUT")
+            request_timeout = self._int(timeout_value, 10, 1, 60)
+            with self._urlopen(req, cfg, timeout=request_timeout) as response:
                 body = response.read()
             with self._cache_lock:
                 self._cache[key] = (time.time(), body, response)
