@@ -17,7 +17,7 @@ from PIL import Image
 from plugins.metadata.base import BaseMetadataProvider
 
 
-PLUGIN_VERSION = "1.3.1"
+PLUGIN_VERSION = "1.4.0"
 LEGACY_PLUGIN_ID = "naverkakaoridi_meta"
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
 DETAIL_WORKERS = 4
@@ -67,6 +67,14 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             "required": False,
             "default": DEFAULT_USER_AGENT,
             "description": "기본 브라우저 User-Agent. 차단 회피가 필요할 때만 변경.",
+        },
+        {
+            "key": "PROXY_URL",
+            "label": "HTTP(S) 프록시 URL",
+            "type": "password",
+            "required": False,
+            "default": "",
+            "description": "선택 사항. http://host:port 또는 http://user:password@host:port 형식. 검색과 표지 다운로드에 함께 적용됩니다.",
         },
         {
             "key": "SEARCH_EXACT",
@@ -228,7 +236,7 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
                 return False, "대상 도서를 찾을 수 없습니다."
 
             cfg = self._get_config(db_type)
-            cover_filename = self._save_cover(book, item_data.get("cover"))
+            cover_filename = self._save_cover(book, item_data.get("cover"), cfg)
             description = self._clean_text(item_data.get("description"))
             author = self._clean_text(item_data.get("author"))
             publisher = self._clean_text(item_data.get("publisher"))
@@ -770,7 +778,9 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
 
     def _request(self, url, cfg, headers=None, method=None, data=None):
         ttl = 60
-        key = (url, tuple(sorted((headers or {}).items())), method or "GET", data or b"")
+        proxy_url = self._proxy_url(cfg)
+        proxy_key = hashlib.sha256(proxy_url.encode("utf-8")).hexdigest() if proxy_url else ""
+        key = (url, tuple(sorted((headers or {}).items())), method or "GET", data or b"", proxy_key)
         if method in (None, "GET"):
             with self._cache_lock:
                 cached = self._cache.get(key)
@@ -783,7 +793,8 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
         merged_headers.update(headers or {})
         req = urllib.request.Request(url, headers=merged_headers, method=method, data=data)
         try:
-            with urllib.request.urlopen(req, timeout=self._int(cfg.get("TIMEOUT"), 10, 1, 60)) as response:
+            timeout = self._int(cfg.get("TIMEOUT"), 10, 1, 60)
+            with self._urlopen(req, cfg, timeout=timeout) as response:
                 body = response.read()
             with self._cache_lock:
                 self._cache[key] = (time.time(), body, response)
@@ -792,15 +803,35 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             detail = e.read().decode("utf-8", errors="replace")[:300]
             raise RuntimeError(f"HTTP {e.code}: {detail}") from e
 
-    def _save_cover(self, book, cover_url):
+    def _proxy_url(self, cfg):
+        proxy_url = self._clean_text((cfg or {}).get("PROXY_URL"))
+        if not proxy_url:
+            return ""
+        parsed = urllib.parse.urlsplit(proxy_url)
+        if parsed.scheme.lower() not in ("http", "https") or not parsed.hostname:
+            raise ValueError("PROXY_URL은 http://host:port 형식이어야 합니다.")
+        return proxy_url
+
+    def _urlopen(self, request, cfg, timeout):
+        proxy_url = self._proxy_url(cfg)
+        if not proxy_url:
+            return urllib.request.urlopen(request, timeout=timeout)
+        handler = urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
+        opener = urllib.request.build_opener(handler)
+        return opener.open(request, timeout=timeout)
+
+    def _save_cover(self, book, cover_url, cfg):
         if not cover_url:
             return None
         try:
             dest_path, cover_filename = self._cover_location(book["library_id"], book["file_path"])
             os.makedirs(os.path.dirname(dest_path), exist_ok=True)
 
-            req = urllib.request.Request(cover_url, headers={"User-Agent": DEFAULT_USER_AGENT})
-            with urllib.request.urlopen(req, timeout=10) as response:
+            req = urllib.request.Request(
+                cover_url,
+                headers={"User-Agent": cfg.get("USER_AGENT") or DEFAULT_USER_AGENT},
+            )
+            with self._urlopen(req, cfg, timeout=self._int(cfg.get("TIMEOUT"), 10, 1, 60)) as response:
                 img_data = response.read()
             with Image.open(io.BytesIO(img_data)) as img:
                 img.save(dest_path, "WEBP", quality=82)

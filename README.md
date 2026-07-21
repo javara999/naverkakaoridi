@@ -8,7 +8,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 플러그인 버전 | `1.3.1` |
+| 플러그인 버전 | `1.4.0` |
 | 플러그인 ID | `naverkakaoridi` |
 | 이전 플러그인 ID | `naverkakaoridi_meta` |
 | 클래스 | `NaverkakaoridiMetadataProvider` |
@@ -50,6 +50,7 @@
 | `MAX_RESULTS` | number | `20` | 통합 결과 최대 개수, 허용 범위 1~100 |
 | `TIMEOUT` | number | `10` | 외부 요청 제한 시간(초), 허용 범위 1~60 |
 | `USER_AGENT` | text | 내장 브라우저 UA | 외부 요청에 사용할 User-Agent |
+| `PROXY_URL` | password | 빈 값 | 검색과 표지 다운로드에 사용할 HTTP(S) 프록시 URL |
 | `SEARCH_EXACT` | checkbox | `false` | 정규화한 제목이 검색어와 같은 결과만 표시 |
 | `INCLUDE_ADULT` | checkbox | `false` | 성인 플래그가 있는 결과 포함 |
 | `APPLY_COVER_TO_SERIES` | checkbox | `true` | 같은 보관함·시리즈의 모든 권/화에 선택한 표지 적용 |
@@ -59,7 +60,10 @@
 | `RIDI_COOKIE` | password | 빈 값 | 리디 로그인/연령 제한용 Cookie |
 | `KAKAOPAGE_CATEGORY` | text | `all` | `comic`, `novel`, `book` 또는 숫자 카테고리 ID |
 
-Cookie 입력란은 화면에서 비밀번호 형식으로 가려지지만 BookOasis 설정 DB에는 설정 JSON의 일부로 저장됩니다. 필요한 Cookie만 입력하고 계정 보안 정책에 맞게 주기적으로 갱신하세요.
+Cookie와 프록시 URL 입력란은 화면에서 비밀번호 형식으로 가려지지만 BookOasis 설정 DB에는 설정 JSON의 일부로 저장됩니다. 필요한 값만 입력하고 계정 보안 정책에 맞게 주기적으로 갱신하세요.
+
+프록시는 `http://host:port` 또는 `http://user:password@host:port` 형식을 지원합니다. SOCKS 프록시는 지원하지 않습니다.
+리디의 Cloudflare 403은 프록시에서도 발생할 수 있습니다. 공개·데이터센터 프록시보다 신뢰 가능한 고정 프록시를 사용하고, 필요한 경우 `RIDI_COOKIE`도 함께 설정하세요.
 
 ## 검색 결과 규격
 
@@ -103,6 +107,12 @@ plugins/metadata/naverkakaoridi/
 - 외부 서비스별 요청 오류는 해당 소스 결과만 제외하고 다른 소스 검색은 계속 진행합니다.
 
 ## 변경 이력
+
+### 1.4.0 - 2026-07-21
+
+- 플러그인 설정에 `PROXY_URL` 추가
+- 검색·상세정보·표지 다운로드 요청에 동일한 HTTP(S) 프록시 적용
+- 프록시별 응답 캐시 분리 및 URL 형식 검증
 
 ### 1.3.1 - 2026-07-21
 
