@@ -8,15 +8,15 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 플러그인 버전 | `1.4.2` |
+| 플러그인 버전 | `1.4.3` |
 | 플러그인 ID | `naverkakaoridi` |
 | 이전 플러그인 ID | `naverkakaoridi_meta` |
 | 클래스 | `NaverkakaoridiMetadataProvider` |
 | 모듈 | `plugins.metadata.naverkakaoridi.naverkakaoridi` |
 | 유형 | 검색형 메타데이터 제공자 |
-| 확인한 BookOasis 버전 | `1.2.1` |
-| 확인한 BookOasis 커밋 | `4f204be` |
-| 문서 작성일 | `2026-07-20` |
+| 확인한 BookOasis 버전 | `1.2.9` |
+| 확인한 BookOasis 커밋 | `e025ee3` |
+| 문서 작성일 | `2026-07-21` |
 
 이 버전은 BookOasis의 권장 폴더형 플러그인 구조와 DB Gateway 규격을 사용합니다. BookOasis 코어 파일을 수정하지 않습니다.
 
@@ -90,7 +90,8 @@ Cookie와 프록시 URL 입력란은 화면에서 비밀번호 형식으로 가�
 plugins/metadata/naverkakaoridi/
 ├── __init__.py
 ├── naverkakaoridi.py
-└── README.md
+├── README.md
+└── VERSION
 ```
 
 1. 기존 단일 파일 `plugins/metadata/naverkakaoridi_meta.py`가 있으면 제거하고 위 폴더를 배치합니다.
@@ -99,6 +100,17 @@ plugins/metadata/naverkakaoridi/
 4. 설정을 확인한 뒤 한 번 저장하면 새 키 `PLUGIN_CONFIG_naverkakaoridi`가 사용됩니다.
 
 플러그인 ID가 `naverkakaoridi_meta`에서 `naverkakaoridi`로 변경되었습니다. 버전 `1.0.0`은 새 설정이 아직 비어 있을 때 기존 `PLUGIN_CONFIG_naverkakaoridi_meta` 값을 읽는 호환 폴백을 제공합니다. 활성화 상태 키는 ID에 종속되므로 기존 `PLUGIN_ENABLED_naverkakaoridi_meta` 값은 자동 이전되지 않습니다. 업그레이드 후 새 플러그인의 활성화 상태를 환경설정에서 확인하세요.
+
+## 샘플 업데이트
+
+BookOasis의 플러그인 설정 화면에서 샘플 업데이트 버튼을 표시하도록 `update_manifest`를 제공합니다.
+
+- 원격 원본: `https://github.com/javara999/naverkakaoridi`
+- 업데이트 방식: GitHub raw 파일 다운로드
+- 교체 대상: `naverkakaoridi.py`, `__init__.py`, `README.md`, `VERSION`
+- 업데이트 조건: 로컬 `VERSION`의 `plugin version` 값이 GitHub의 값보다 낮을 때만 실행
+
+버전이 같거나 로컬 버전이 더 높으면 BookOasis 정책에 따라 업데이트가 차단됩니다.
 
 ## 제한 사항
 
@@ -109,6 +121,12 @@ plugins/metadata/naverkakaoridi/
 - 외부 서비스별 요청 오류는 해당 소스 결과만 제외하고 다른 소스 검색은 계속 진행합니다.
 
 ## 변경 이력
+
+### 1.4.3 - 2026-07-21
+
+- BookOasis 샘플 업데이트 버튼 지원을 위한 `update_manifest` 추가
+- GitHub raw 기반 업데이트용 `VERSION` 파일 추가
+- 업데이트 대상 파일을 `naverkakaoridi.py`, `__init__.py`, `README.md`, `VERSION`으로 선언
 
 ### 1.4.2 - 2026-07-21
 

@@ -17,7 +17,7 @@ from PIL import Image
 from plugins.metadata.base import BaseMetadataProvider
 
 
-PLUGIN_VERSION = "1.4.2"
+PLUGIN_VERSION = "1.4.3"
 LEGACY_PLUGIN_ID = "naverkakaoridi_meta"
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
 DETAIL_WORKERS = 4
@@ -150,6 +150,15 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             "description": "기본값 all. comic=10, novel=11, book=16 또는 숫자 category_uid 입력 가능.",
         },
     ]
+    update_manifest = {
+        "enabled": True,
+        "provider": "github-raw",
+        "raw_base_url": "https://raw.githubusercontent.com/javara999/naverkakaoridi/main",
+        "files": ["naverkakaoridi.py", "__init__.py", "README.md", "VERSION"],
+        "version_file": "VERSION",
+        "version_key": "plugin version",
+        "show_sample_update_button": True,
+    }
 
     SOURCE_ORDER = ("naver_webtoon", "naver_series", "kakao_webtoon", "kakaopage", "ridibooks", "novelpia")
     _cache = {}
