@@ -8,7 +8,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 플러그인 버전 | `1.4.1` |
+| 플러그인 버전 | `1.4.2` |
 | 플러그인 ID | `naverkakaoridi` |
 | 이전 플러그인 ID | `naverkakaoridi_meta` |
 | 클래스 | `NaverkakaoridiMetadataProvider` |
@@ -109,6 +109,11 @@ plugins/metadata/naverkakaoridi/
 - 외부 서비스별 요청 오류는 해당 소스 결과만 제외하고 다른 소스 검색은 계속 진행합니다.
 
 ## 변경 이력
+
+### 1.4.2 - 2026-07-21
+
+- BookOasis v1.2.8 `PluginDatabaseGateway`의 `execute`/`execute_many` API 적용
+- 제거된 `transaction()` 호출로 메타데이터 적용이 실패하던 문제 수정
 
 ### 1.4.1 - 2026-07-21
 

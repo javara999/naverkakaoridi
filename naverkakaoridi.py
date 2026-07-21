@@ -17,7 +17,7 @@ from PIL import Image
 from plugins.metadata.base import BaseMetadataProvider
 
 
-PLUGIN_VERSION = "1.4.1"
+PLUGIN_VERSION = "1.4.2"
 LEGACY_PLUGIN_ID = "naverkakaoridi_meta"
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
 DETAIL_WORKERS = 4
@@ -308,49 +308,47 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
                 ]
 
             series_cover_count = 0
-            with gateway.transaction() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    """
-                    UPDATE books
-                    SET author = ?,
-                        isbn = COALESCE(NULLIF(?, ''), isbn),
-                        publisher = ?,
-                        summary = ?,
-                        link = ?,
-                        release_date = COALESCE(NULLIF(?, ''), release_date),
-                        genre = COALESCE(NULLIF(?, ''), genre),
-                        tags = COALESCE(NULLIF(?, ''), tags),
-                        score = COALESCE(NULLIF(?, ''), score),
-                        cover_image = COALESCE(NULLIF(?, ''), cover_image),
-                        cover_updated_at = CASE
-                            WHEN NULLIF(?, '') IS NOT NULL THEN CURRENT_TIMESTAMP
-                            ELSE cover_updated_at
-                        END,
-                        metadata_locked = 1
-                    WHERE id = ? AND COALESCE(is_deleted, 0) = 0
-                    """,
-                    (
-                        author,
-                        isbn,
-                        publisher,
-                        description,
-                        link,
-                        release_date,
-                        genre,
-                        tags,
-                        score,
-                        cover_filename or "",
-                        cover_filename or "",
-                        book_id,
-                    ),
-                )
-                count = cursor.rowcount
-                if count != 1:
-                    raise RuntimeError("대상 도서가 삭제되었거나 변경되어 메타데이터를 적용하지 못했습니다.")
+            count = gateway.execute(
+                """
+                UPDATE books
+                SET author = ?,
+                    isbn = COALESCE(NULLIF(?, ''), isbn),
+                    publisher = ?,
+                    summary = ?,
+                    link = ?,
+                    release_date = COALESCE(NULLIF(?, ''), release_date),
+                    genre = COALESCE(NULLIF(?, ''), genre),
+                    tags = COALESCE(NULLIF(?, ''), tags),
+                    score = COALESCE(NULLIF(?, ''), score),
+                    cover_image = COALESCE(NULLIF(?, ''), cover_image),
+                    cover_updated_at = CASE
+                        WHEN NULLIF(?, '') IS NOT NULL THEN CURRENT_TIMESTAMP
+                        ELSE cover_updated_at
+                    END,
+                    metadata_locked = 1
+                WHERE id = ? AND COALESCE(is_deleted, 0) = 0
+                """,
+                (
+                    author,
+                    isbn,
+                    publisher,
+                    description,
+                    link,
+                    release_date,
+                    genre,
+                    tags,
+                    score,
+                    cover_filename or "",
+                    cover_filename or "",
+                    book_id,
+                ),
+            )
+            if count != 1:
+                raise RuntimeError("대상 도서가 삭제되었거나 변경되어 메타데이터를 적용하지 못했습니다.")
 
-                if series_cover_updates:
-                    cursor.executemany(
+            if series_cover_updates:
+                series_cover_count = max(
+                    gateway.execute_many(
                         """
                         UPDATE books
                         SET cover_image = ?,
@@ -361,22 +359,23 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
                           AND COALESCE(is_deleted, 0) = 0
                         """,
                         series_cover_updates,
-                    )
-                    series_cover_count = max(cursor.rowcount, 0)
-                    series_cover_failures += max(len(series_cover_updates) - series_cover_count, 0)
+                    ),
+                    0,
+                )
+                series_cover_failures += max(len(series_cover_updates) - series_cover_count, 0)
 
-                if series_rating_updates:
-                    cursor.executemany(
-                        """
-                        UPDATE books
-                        SET score = ?, summary = ?, metadata_locked = 1
-                        WHERE id = ?
-                          AND library_id = ?
-                          AND series_name = ?
-                          AND COALESCE(is_deleted, 0) = 0
-                        """,
-                        series_rating_updates,
-                    )
+            if series_rating_updates:
+                gateway.execute_many(
+                    """
+                    UPDATE books
+                    SET score = ?, summary = ?, metadata_locked = 1
+                    WHERE id = ?
+                      AND library_id = ?
+                      AND series_name = ?
+                      AND COALESCE(is_deleted, 0) = 0
+                    """,
+                    series_rating_updates,
+                )
 
             title = item_data.get("title") or book_id
             message = f'"{title}" 메타데이터를 {count}개 항목에 반영했습니다.'
