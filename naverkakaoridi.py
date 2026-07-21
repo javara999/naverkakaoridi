@@ -17,10 +17,17 @@ from PIL import Image
 from plugins.metadata.base import BaseMetadataProvider
 
 
-PLUGIN_VERSION = "1.2.0"
+PLUGIN_VERSION = "1.3.0"
 LEGACY_PLUGIN_ID = "naverkakaoridi_meta"
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
 DETAIL_WORKERS = 4
+RATING_SCALES = {
+    "네이버웹툰": 10,
+    "네이버시리즈": 10,
+    "카카오웹툰": 10,
+    "카카오페이지": 10,
+    "리디": 5,
+}
 
 
 class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
@@ -371,10 +378,26 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
 
     def _naver_webtoon_detail(self, title_id, cfg):
         url = "https://comic.naver.com/api/article/list/info?" + urllib.parse.urlencode({"titleId": title_id})
+        detail = {}
         try:
-            return self._get_json(url, cfg, headers=self._naver_headers(cfg, "https://comic.naver.com/"))
+            detail = self._get_json(url, cfg, headers=self._naver_headers(cfg, "https://comic.naver.com/"))
         except Exception:
-            return {}
+            pass
+
+        try:
+            mobile_url = "https://m.comic.naver.com/webtoon/list?" + urllib.parse.urlencode({"titleId": title_id})
+            text = self._get_text(mobile_url, cfg, headers=self._naver_headers(cfg, "https://m.comic.naver.com/"))
+            match = re.search(
+                r'<span[^>]*class=["\'][^"\']*ico_score[^"\']*["\'][^>]*>.*?'
+                r'<span[^>]*class=["\'][^"\']*score[^"\']*["\'][^>]*>\s*([\d.]+)\s*</span>',
+                text,
+                re.I | re.S,
+            )
+            if match:
+                detail["starScore"] = match.group(1)
+        except Exception as e:
+            print(f"[NaverkakaoridiMetadataProvider] Naver Webtoon rating fetch failed: {e}")
+        return detail
 
     def _search_naver_series(self, query, cfg):
         params = urllib.parse.urlencode({"t": "all", "fs": "comic", "q": query})
@@ -410,6 +433,12 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
         if m:
             author = self._clean_text(m.group(1))
         tags = ", ".join(re.findall(r"#([^\s#]+)", desc))
+        score_match = re.search(
+            r'<div[^>]*class=["\'][^"\']*score_area[^"\']*["\'][^>]*>.*?'
+            r'<em[^>]*>\s*([\d.]+)\s*</em>',
+            text,
+            re.I | re.S,
+        )
         return self._item(
             source="네이버시리즈",
             title=title,
@@ -421,7 +450,7 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             genre="",
             tags=tags,
             pub_date="",
-            score="",
+            score=score_match.group(1) if score_match else "",
         )
 
     def _search_kakao_webtoon(self, query, cfg):
@@ -781,19 +810,50 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
         return os.path.join(base_dir, "covers", str(library_id), filename), relative_path
 
     def _item(self, source, title, author, publisher, cover, description, link, genre, tags, pub_date, score, isbn=""):
-        return {
+        description = self._clean_text(description)
+        rating = self._rating_metadata(source, score)
+        if rating:
+            rating_label = f"[평점: {rating['value']:g}/{rating['scale']} | 출처: {source}]"
+            description = f"{rating_label} {description}".strip()
+
+        item = {
             "title": self._clean_text(title),
             "author": self._clean_text(author),
             "publisher": self._clean_text(publisher),
             "isbn": self._clean_text(isbn),
             "pubDate": self._clean_text(pub_date),
             "cover": cover or "",
-            "description": self._clean_text(description),
+            "description": description,
             "link": link or "",
             "genre": self._clean_text(genre),
             "tags": self._clean_text(tags),
-            "score": self._clean_text(score),
+            "score": rating["score"] if rating else "",
             "source": source,
+        }
+        if rating:
+            item.update(
+                {
+                    "rating_value": rating["value"],
+                    "rating_scale": rating["scale"],
+                    "rating_source": source,
+                }
+            )
+        return item
+
+    def _rating_metadata(self, source, value):
+        scale = RATING_SCALES.get(self._clean_text(source))
+        if not scale:
+            return None
+        try:
+            rating = float(value)
+        except (TypeError, ValueError):
+            return None
+        if rating <= 0 or rating > scale:
+            return None
+        return {
+            "value": round(rating, 2),
+            "scale": scale,
+            "score": max(1, min(100, int(round(rating * 100 / scale)))),
         }
 
     def _with_source_prefix(self, item):
