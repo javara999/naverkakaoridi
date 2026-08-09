@@ -8,17 +8,18 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 플러그인 버전 | `1.4.3` |
+| 플러그인 버전 | `1.5.0` |
 | 플러그인 ID | `naverkakaoridi` |
 | 이전 플러그인 ID | `naverkakaoridi_meta` |
 | 클래스 | `NaverkakaoridiMetadataProvider` |
 | 모듈 | `plugins.metadata.naverkakaoridi.naverkakaoridi` |
 | 유형 | 검색형 메타데이터 제공자 |
-| 확인한 BookOasis 버전 | `1.2.9` |
-| 확인한 BookOasis 커밋 | `e025ee3` |
-| 문서 작성일 | `2026-07-21` |
+| 확인한 BookOasis 버전 | `1.9.0` |
+| 확인한 BookOasis 커밋 | `56f7e34` |
+| 지원 DBMS | `SQLite`, `MariaDB` |
+| 문서 작성일 | `2026-08-10` |
 
-이 버전은 BookOasis의 권장 폴더형 플러그인 구조와 DB Gateway 규격을 사용합니다. BookOasis 코어 파일을 수정하지 않습니다.
+이 버전은 BookOasis의 권장 폴더형 플러그인 구조와 DB Gateway 규격을 사용합니다. SQLite와 MariaDB에서 동일한 게이트웨이 쿼리를 사용하며 BookOasis 코어 파일을 수정하지 않습니다.
 
 ## 지원 검색 소스
 
@@ -121,6 +122,13 @@ BookOasis의 플러그인 설정 화면에서 샘플 업데이트 버튼을 표�
 - 외부 서비스별 요청 오류는 해당 소스 결과만 제외하고 다른 소스 검색은 계속 진행합니다.
 
 ## 변경 이력
+
+### 1.5.0 - 2026-08-10
+
+- BookOasis v1.9.0 MariaDB 게이트웨이 및 스키마 호환
+- MariaDB strict mode에 맞춰 선택 필드를 `NULL`, 평점을 정수로 전달
+- 동일 메타데이터 재적용 시 MariaDB 변경 행 수가 0이어도 대상 도서가 존재하면 성공 처리
+- SQLite/MariaDB 공통 SQL 비교 연산자와 시리즈 적용 건수 처리 사용
 
 ### 1.4.3 - 2026-07-21
 

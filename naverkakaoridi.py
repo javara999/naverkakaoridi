@@ -17,7 +17,7 @@ from PIL import Image
 from plugins.metadata.base import BaseMetadataProvider
 
 
-PLUGIN_VERSION = "1.4.3"
+PLUGIN_VERSION = "1.5.0"
 LEGACY_PLUGIN_ID = "naverkakaoridi_meta"
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
 DETAIL_WORKERS = 4
@@ -266,7 +266,7 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             link = item_data.get("link") or ""
             genre = self._clean_text(item_data.get("genre"))
             tags = self._clean_text(item_data.get("tags"))
-            score = self._clean_text(item_data.get("score"))
+            score = self._optional_score(item_data.get("score"))
             rating_label = self._clean_text(item_data.get("rating_label"))
 
             raw_series_name = book["series_name"] or ""
@@ -286,7 +286,7 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
                 )
 
             series_rating_enabled = bool(
-                score
+                score is not None
                 and rating_label
                 and self._clean_text(raw_series_name)
                 and book["library_id"] is not None
@@ -300,7 +300,7 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
                     FROM books
                     WHERE library_id = ?
                       AND series_name = ?
-                      AND id != ?
+                      AND id <> ?
                       AND COALESCE(is_deleted, 0) = 0
                     """,
                     (book["library_id"], raw_series_name, book_id),
@@ -321,17 +321,17 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
                 """
                 UPDATE books
                 SET author = ?,
-                    isbn = COALESCE(NULLIF(?, ''), isbn),
+                    isbn = COALESCE(?, isbn),
                     publisher = ?,
                     summary = ?,
                     link = ?,
-                    release_date = COALESCE(NULLIF(?, ''), release_date),
-                    genre = COALESCE(NULLIF(?, ''), genre),
-                    tags = COALESCE(NULLIF(?, ''), tags),
-                    score = COALESCE(NULLIF(?, ''), score),
-                    cover_image = COALESCE(NULLIF(?, ''), cover_image),
+                    release_date = COALESCE(?, release_date),
+                    genre = COALESCE(?, genre),
+                    tags = COALESCE(?, tags),
+                    score = COALESCE(?, score),
+                    cover_image = COALESCE(?, cover_image),
                     cover_updated_at = CASE
-                        WHEN NULLIF(?, '') IS NOT NULL THEN CURRENT_TIMESTAMP
+                        WHEN ? IS NOT NULL THEN CURRENT_TIMESTAMP
                         ELSE cover_updated_at
                     END,
                     metadata_locked = 1
@@ -339,39 +339,42 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
                 """,
                 (
                     author,
-                    isbn,
+                    isbn or None,
                     publisher,
                     description,
                     link,
-                    release_date,
-                    genre,
-                    tags,
+                    release_date or None,
+                    genre or None,
+                    tags or None,
                     score,
-                    cover_filename or "",
-                    cover_filename or "",
+                    cover_filename or None,
+                    cover_filename or None,
                     book_id,
                 ),
             )
+            if count == 0:
+                existing = gateway.fetch_one(
+                    "SELECT id FROM books WHERE id = ? AND COALESCE(is_deleted, 0) = 0",
+                    (book_id,),
+                )
+                count = 1 if existing else 0
             if count != 1:
                 raise RuntimeError("대상 도서가 삭제되었거나 변경되어 메타데이터를 적용하지 못했습니다.")
 
             if series_cover_updates:
-                series_cover_count = max(
-                    gateway.execute_many(
-                        """
-                        UPDATE books
-                        SET cover_image = ?,
-                            cover_updated_at = CURRENT_TIMESTAMP
-                        WHERE id = ?
-                          AND library_id = ?
-                          AND series_name = ?
-                          AND COALESCE(is_deleted, 0) = 0
-                        """,
-                        series_cover_updates,
-                    ),
-                    0,
+                gateway.execute_many(
+                    """
+                    UPDATE books
+                    SET cover_image = ?,
+                        cover_updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                      AND library_id = ?
+                      AND series_name = ?
+                      AND COALESCE(is_deleted, 0) = 0
+                    """,
+                    series_cover_updates,
                 )
-                series_cover_failures += max(len(series_cover_updates) - series_cover_count, 0)
+                series_cover_count = len(series_cover_updates)
 
             if series_rating_updates:
                 gateway.execute_many(
@@ -885,7 +888,7 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             FROM books
             WHERE library_id = ?
               AND series_name = ?
-              AND id != ?
+              AND id <> ?
               AND COALESCE(is_deleted, 0) = 0
             """,
             (book["library_id"], series_name, book["id"]),
@@ -1208,6 +1211,16 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
 
     def _truthy(self, value):
         return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
+
+    def _optional_score(self, value):
+        text = self._clean_text(value)
+        if not text:
+            return None
+        try:
+            score = int(round(float(text)))
+        except (TypeError, ValueError):
+            return None
+        return max(0, min(100, score))
 
     def _int(self, value, default, min_value, max_value):
         try:
