@@ -1,0 +1,107 @@
+<div class="nkr-settings-panel">
+  <div class="nkr-settings-title">통합 웹툰/웹소설 검색 설정</div>
+  <div class="nkr-settings-desc">검색 대상, 요청 방식, 시리즈 적용 범위를 설정합니다.</div>
+  <details class="nkr-settings-section">
+    <summary>설정 펼치기 (클릭)</summary>
+    <div class="nkr-settings-body">
+      <div class="nkr-settings-field">
+        <label for="nkr-sources">검색 사이트</label>
+        <div class="nkr-input-container">
+          <input id="nkr-sources" type="text" name="SOURCES" value="all">
+          <p class="hint">all 또는 naver_webtoon, naver_series, kakao_webtoon, kakaopage, ridibooks, novelpia를 쉼표로 구분합니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field">
+        <label for="nkr-max-results">최대 검색 결과</label>
+        <div class="nkr-input-container">
+          <input id="nkr-max-results" type="number" name="MAX_RESULTS" value="20" min="1" max="100">
+          <p class="hint">전체 사이트 결과를 합쳐 반환할 최대 개수입니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field">
+        <label for="nkr-timeout">요청 제한 시간</label>
+        <div class="nkr-input-container">
+          <input id="nkr-timeout" type="number" name="TIMEOUT" value="10" min="1" max="60">
+          <p class="hint">외부 사이트 응답을 기다릴 시간(초)입니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field">
+        <label for="nkr-user-agent">User-Agent</label>
+        <div class="nkr-input-container">
+          <input id="nkr-user-agent" type="text" name="USER_AGENT" value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36">
+          <p class="hint">차단 회피가 필요할 때만 변경합니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field">
+        <label for="nkr-proxy-url">HTTP(S) 프록시 URL</label>
+        <div class="nkr-input-container">
+          <input id="nkr-proxy-url" type="password" name="PROXY_URL" placeholder="http://host:port">
+          <p class="hint">선택 사항이며 검색과 표지 다운로드에 공통 적용됩니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field">
+        <label for="nkr-novelpia-timeout">노벨피아 제한 시간</label>
+        <div class="nkr-input-container">
+          <input id="nkr-novelpia-timeout" type="number" name="NOVELPIA_TIMEOUT" value="3" min="1" max="15">
+          <p class="hint">시간 초과 시 5분 동안 노벨피아 요청만 건너뜁니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field nkr-checkbox-field">
+        <label for="nkr-search-exact">정확한 제목만</label>
+        <div class="nkr-input-container">
+          <input id="nkr-search-exact" type="checkbox" name="SEARCH_EXACT">
+          <p class="hint">검색어와 제목이 거의 같은 결과만 표시합니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field nkr-checkbox-field">
+        <label for="nkr-include-adult">성인 결과 포함</label>
+        <div class="nkr-input-container">
+          <input id="nkr-include-adult" type="checkbox" name="INCLUDE_ADULT">
+          <p class="hint">19세 또는 성인 플래그가 있는 결과도 포함합니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field nkr-checkbox-field">
+        <label for="nkr-apply-cover">같은 시리즈 전체에 표지 적용</label>
+        <div class="nkr-input-container">
+          <input id="nkr-apply-cover" type="checkbox" name="APPLY_COVER_TO_SERIES" checked>
+          <p class="hint">같은 보관함과 시리즈의 모든 권/화에 선택한 표지를 적용합니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field nkr-checkbox-field">
+        <label for="nkr-apply-rating">같은 시리즈 전체에 평점 적용</label>
+        <div class="nkr-input-container">
+          <input id="nkr-apply-rating" type="checkbox" name="APPLY_RATING_TO_SERIES" checked>
+          <p class="hint">같은 보관함과 시리즈의 모든 권/화에 평점과 출처를 적용합니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field">
+        <label for="nkr-naver-cookie">네이버 Cookie</label>
+        <div class="nkr-input-container">
+          <input id="nkr-naver-cookie" type="password" name="NAVER_COOKIE">
+          <p class="hint">연령 제한 또는 로그인 필요 작품 검색 시에만 입력합니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field">
+        <label for="nkr-kakao-cookie">카카오 Cookie</label>
+        <div class="nkr-input-container">
+          <input id="nkr-kakao-cookie" type="password" name="KAKAO_COOKIE">
+          <p class="hint">연령 제한 또는 로그인 필요 작품 검색 시에만 입력합니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field">
+        <label for="nkr-ridi-cookie">리디 Cookie</label>
+        <div class="nkr-input-container">
+          <input id="nkr-ridi-cookie" type="password" name="RIDI_COOKIE">
+          <p class="hint">연령 제한 또는 로그인 필요 작품 검색 시에만 입력합니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field">
+        <label for="nkr-kakaopage-category">카카오페이지 카테고리</label>
+        <div class="nkr-input-container">
+          <input id="nkr-kakaopage-category" type="text" name="KAKAOPAGE_CATEGORY" value="all">
+          <p class="hint">all, comic, novel, book 또는 숫자 category_uid를 입력합니다.</p>
+        </div>
+      </div>
+    </div>
+  </details>
+</div>

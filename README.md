@@ -8,7 +8,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 플러그인 버전 | `1.5.0` |
+| 플러그인 버전 | `1.5.1` |
 | 플러그인 ID | `naverkakaoridi` |
 | 이전 플러그인 ID | `naverkakaoridi_meta` |
 | 클래스 | `NaverkakaoridiMetadataProvider` |
@@ -91,6 +91,8 @@ Cookie와 프록시 URL 입력란은 화면에서 비밀번호 형식으로 가�
 plugins/metadata/naverkakaoridi/
 ├── __init__.py
 ├── naverkakaoridi.py
+├── settings.html
+├── settings.css
 ├── README.md
 └── VERSION
 ```
@@ -108,10 +110,11 @@ BookOasis의 플러그인 설정 화면에서 샘플 업데이트 버튼을 표�
 
 - 원격 원본: `https://github.com/javara999/naverkakaoridi`
 - 업데이트 방식: GitHub raw 파일 다운로드
-- 교체 대상: `naverkakaoridi.py`, `__init__.py`, `README.md`, `VERSION`
+- 교체 대상: `naverkakaoridi.py`, `settings.html`, `settings.css`, `__init__.py`, `README.md`, `VERSION`
 - 업데이트 조건: 로컬 `VERSION`의 `plugin version` 값이 GitHub의 값보다 낮을 때만 실행
 
 버전이 같거나 로컬 버전이 더 높으면 BookOasis 정책에 따라 업데이트가 차단됩니다.
+`1.5.0` 이하에서 처음 업그레이드할 때는 구버전 매니페스트에 `settings.html`과 `settings.css`가 없으므로 저장소 폴더 전체를 교체한 뒤 BookOasis를 재시작해야 합니다.
 
 ## 제한 사항
 
@@ -122,6 +125,11 @@ BookOasis의 플러그인 설정 화면에서 샘플 업데이트 버튼을 표�
 - 외부 서비스별 요청 오류는 해당 소스 결과만 제외하고 다른 소스 검색은 계속 진행합니다.
 
 ## 변경 이력
+
+### 1.5.1 - 2026-08-10
+
+- 플러그인 설정을 클릭해서 펼치는 커스텀 설정 화면 추가
+- 기존 설정 키, 기본값 및 저장 방식 유지
 
 ### 1.5.0 - 2026-08-10
 
