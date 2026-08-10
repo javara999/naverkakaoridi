@@ -5,10 +5,45 @@
     <summary>설정 펼치기 (클릭)</summary>
     <div class="nkr-settings-body">
       <div class="nkr-settings-field">
-        <label for="nkr-sources">검색 사이트</label>
+        <label for="nkr-sources">세부 검색 사이트(고급)</label>
         <div class="nkr-input-container">
           <input id="nkr-sources" type="text" name="SOURCES" value="all">
-          <p class="hint">all 또는 naver_webtoon, naver_series, kakao_webtoon, kakaopage, ridibooks, novelpia, munpia를 쉼표로 구분합니다.</p>
+          <p class="hint">일반적으로 all을 유지합니다. 그룹 안에서 일부 사이트만 검색할 때 식별자를 쉼표로 구분합니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field nkr-checkbox-field">
+        <label for="nkr-search-naver">네이버 검색</label>
+        <div class="nkr-input-container">
+          <input id="nkr-search-naver" type="checkbox" name="SEARCH_NAVER" checked>
+          <p class="hint">네이버웹툰과 네이버시리즈를 검색합니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field nkr-checkbox-field">
+        <label for="nkr-search-kakao">카카오 검색</label>
+        <div class="nkr-input-container">
+          <input id="nkr-search-kakao" type="checkbox" name="SEARCH_KAKAO" checked>
+          <p class="hint">카카오웹툰과 카카오페이지를 검색합니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field nkr-checkbox-field">
+        <label for="nkr-search-ridi">리디 검색</label>
+        <div class="nkr-input-container">
+          <input id="nkr-search-ridi" type="checkbox" name="SEARCH_RIDI" checked>
+          <p class="hint">리디를 검색합니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field nkr-checkbox-field">
+        <label for="nkr-search-novelpia">노벨피아 검색</label>
+        <div class="nkr-input-container">
+          <input id="nkr-search-novelpia" type="checkbox" name="SEARCH_NOVELPIA" checked>
+          <p class="hint">노벨피아를 검색합니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field nkr-checkbox-field">
+        <label for="nkr-search-munpia">문피아 검색</label>
+        <div class="nkr-input-container">
+          <input id="nkr-search-munpia" type="checkbox" name="SEARCH_MUNPIA" checked>
+          <p class="hint">문피아를 검색합니다.</p>
         </div>
       </div>
       <div class="nkr-settings-field">

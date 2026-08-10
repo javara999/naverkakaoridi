@@ -17,7 +17,7 @@ from PIL import Image
 from plugins.metadata.base import BaseMetadataProvider
 
 
-PLUGIN_VERSION = "1.6.0"
+PLUGIN_VERSION = "1.6.1"
 LEGACY_PLUGIN_ID = "naverkakaoridi_meta"
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
 DETAIL_WORKERS = 4
@@ -39,11 +39,51 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
     config_schema = [
         {
             "key": "SOURCES",
-            "label": "검색 사이트",
+            "label": "세부 검색 사이트(고급)",
             "type": "text",
             "required": False,
             "default": "all",
             "description": "기본값 all. 사용 가능: all, naver_webtoon, naver_series, kakao_webtoon, kakaopage, ridibooks, novelpia, munpia. 여러 개는 콤마로 구분.",
+        },
+        {
+            "key": "SEARCH_NAVER",
+            "label": "네이버 검색",
+            "type": "checkbox",
+            "required": False,
+            "default": True,
+            "description": "네이버웹툰과 네이버시리즈를 검색합니다.",
+        },
+        {
+            "key": "SEARCH_KAKAO",
+            "label": "카카오 검색",
+            "type": "checkbox",
+            "required": False,
+            "default": True,
+            "description": "카카오웹툰과 카카오페이지를 검색합니다.",
+        },
+        {
+            "key": "SEARCH_RIDI",
+            "label": "리디 검색",
+            "type": "checkbox",
+            "required": False,
+            "default": True,
+            "description": "리디를 검색합니다.",
+        },
+        {
+            "key": "SEARCH_NOVELPIA",
+            "label": "노벨피아 검색",
+            "type": "checkbox",
+            "required": False,
+            "default": True,
+            "description": "노벨피아를 검색합니다.",
+        },
+        {
+            "key": "SEARCH_MUNPIA",
+            "label": "문피아 검색",
+            "type": "checkbox",
+            "required": False,
+            "default": True,
+            "description": "문피아를 검색합니다.",
         },
         {
             "key": "MAX_RESULTS",
@@ -169,6 +209,15 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
     }
 
     SOURCE_ORDER = ("naver_webtoon", "naver_series", "kakao_webtoon", "kakaopage", "ridibooks", "novelpia", "munpia")
+    SOURCE_TOGGLES = {
+        "naver_webtoon": "SEARCH_NAVER",
+        "naver_series": "SEARCH_NAVER",
+        "kakao_webtoon": "SEARCH_KAKAO",
+        "kakaopage": "SEARCH_KAKAO",
+        "ridibooks": "SEARCH_RIDI",
+        "novelpia": "SEARCH_NOVELPIA",
+        "munpia": "SEARCH_MUNPIA",
+    }
     _cache = {}
     _cache_lock = threading.Lock()
     _source_cooldowns = {}
@@ -180,7 +229,11 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
 
         cfg = self._get_config(db_type)
         max_results = self._int(cfg.get("MAX_RESULTS"), 20, 1, 100)
-        sources = self._sources(cfg.get("SOURCES"))
+        sources = {
+            source
+            for source in self._sources(cfg.get("SOURCES"))
+            if self._truthy(cfg.get(self.SOURCE_TOGGLES[source], True))
+        }
 
         results = []
         for source in self.SOURCE_ORDER:

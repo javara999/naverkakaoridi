@@ -8,7 +8,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 플러그인 버전 | `1.6.0` |
+| 플러그인 버전 | `1.6.1` |
 | 플러그인 ID | `naverkakaoridi` |
 | 이전 플러그인 ID | `naverkakaoridi_meta` |
 | 클래스 | `NaverkakaoridiMetadataProvider` |
@@ -32,6 +32,7 @@
 - 문피아 (`munpia`)
 
 `SOURCES`를 `all`로 설정하면 모든 소스를 순서대로 검색합니다. 일부 소스만 사용할 때는 위 식별자를 쉼표로 구분해 입력합니다.
+네이버·카카오·리디·노벨피아·문피아 체크박스를 끄면 `SOURCES` 값과 관계없이 해당 그룹은 검색하지 않습니다.
 
 ## 검색 결과와 메타데이터 적용
 
@@ -48,7 +49,12 @@
 
 | 키 | UI 유형 | 기본값 | 설명 |
 | --- | --- | --- | --- |
-| `SOURCES` | text | `all` | 검색할 소스(`naver_webtoon`, `naver_series`, `kakao_webtoon`, `kakaopage`, `ridibooks`, `novelpia`, `munpia`). 여러 값은 쉼표로 구분 |
+| `SOURCES` | text | `all` | 그룹 내부의 세부 검색 소스. 여러 값은 쉼표로 구분 |
+| `SEARCH_NAVER` | checkbox | `true` | 네이버웹툰·네이버시리즈 검색 |
+| `SEARCH_KAKAO` | checkbox | `true` | 카카오웹툰·카카오페이지 검색 |
+| `SEARCH_RIDI` | checkbox | `true` | 리디 검색 |
+| `SEARCH_NOVELPIA` | checkbox | `true` | 노벨피아 검색 |
+| `SEARCH_MUNPIA` | checkbox | `true` | 문피아 검색 |
 | `MAX_RESULTS` | number | `20` | 통합 결과 최대 개수, 허용 범위 1~100 |
 | `TIMEOUT` | number | `10` | 외부 요청 제한 시간(초), 허용 범위 1~60 |
 | `USER_AGENT` | text | 내장 브라우저 UA | 외부 요청에 사용할 User-Agent |
@@ -127,6 +133,11 @@ BookOasis의 플러그인 설정 화면에서 샘플 업데이트 버튼을 표�
 - 외부 서비스별 요청 오류는 해당 소스 결과만 제외하고 다른 소스 검색은 계속 진행합니다.
 
 ## 변경 이력
+
+### 1.6.1 - 2026-08-11
+
+- 네이버, 카카오, 리디, 노벨피아, 문피아 검색 여부를 개별 체크박스로 설정
+- 기존 `SOURCES` 세부 사이트 설정과 이전 저장값 호환 유지
 
 ### 1.6.0 - 2026-08-11
 
