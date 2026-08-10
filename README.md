@@ -8,7 +8,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 플러그인 버전 | `1.6.1` |
+| 플러그인 버전 | `1.6.2` |
 | 플러그인 ID | `naverkakaoridi` |
 | 이전 플러그인 ID | `naverkakaoridi_meta` |
 | 클래스 | `NaverkakaoridiMetadataProvider` |
@@ -47,19 +47,16 @@
 
 ## 설정
 
-| 키 | UI 유형 | 기본값 | 설명 |
+설정 화면에는 다음 항목만 표시합니다.
+
+| 키 | 유형 | 기본값 | 설명 |
 | --- | --- | --- | --- |
-| `SOURCES` | text | `all` | 그룹 내부의 세부 검색 소스. 여러 값은 쉼표로 구분 |
 | `SEARCH_NAVER` | checkbox | `true` | 네이버웹툰·네이버시리즈 검색 |
 | `SEARCH_KAKAO` | checkbox | `true` | 카카오웹툰·카카오페이지 검색 |
 | `SEARCH_RIDI` | checkbox | `true` | 리디 검색 |
 | `SEARCH_NOVELPIA` | checkbox | `true` | 노벨피아 검색 |
 | `SEARCH_MUNPIA` | checkbox | `true` | 문피아 검색 |
-| `MAX_RESULTS` | number | `20` | 통합 결과 최대 개수, 허용 범위 1~100 |
-| `TIMEOUT` | number | `10` | 외부 요청 제한 시간(초), 허용 범위 1~60 |
-| `USER_AGENT` | text | 내장 브라우저 UA | 외부 요청에 사용할 User-Agent |
 | `PROXY_URL` | password | 빈 값 | 검색과 표지 다운로드에 사용할 HTTP(S) 프록시 URL |
-| `NOVELPIA_TIMEOUT` | number | `3` | 노벨피아 요청 제한 시간(초), 허용 범위 1~15 |
 | `SEARCH_EXACT` | checkbox | `false` | 정규화한 제목이 검색어와 같은 결과만 표시 |
 | `INCLUDE_ADULT` | checkbox | `false` | 성인 플래그가 있는 결과 포함 |
 | `APPLY_COVER_TO_SERIES` | checkbox | `true` | 같은 보관함·시리즈의 모든 권/화에 선택한 표지 적용 |
@@ -68,7 +65,17 @@
 | `KAKAO_COOKIE` | password | 빈 값 | 카카오 로그인/연령 제한용 Cookie |
 | `RIDI_COOKIE` | password | 빈 값 | 리디 로그인/연령 제한용 Cookie |
 | `MUNPIA_COOKIE` | password | 빈 값 | 문피아 로그인/연령 제한용 Cookie |
-| `KAKAOPAGE_CATEGORY` | text | `all` | `comic`, `novel`, `book` 또는 숫자 카테고리 ID |
+
+다음 항목은 설정 화면에서 숨기고 내부 기본값을 사용합니다.
+
+| 키 | 기본값 |
+| --- | --- |
+| `SOURCES` | `all` |
+| `MAX_RESULTS` | `20` |
+| `TIMEOUT` | `10`초 |
+| `USER_AGENT` | 내장 브라우저 UA |
+| `NOVELPIA_TIMEOUT` | `3`초 |
+| `KAKAOPAGE_CATEGORY` | `all` |
 
 Cookie와 프록시 URL 입력란은 화면에서 비밀번호 형식으로 가려지지만 BookOasis 설정 DB에는 설정 JSON의 일부로 저장됩니다. 필요한 값만 입력하고 계정 보안 정책에 맞게 주기적으로 갱신하세요.
 
@@ -133,6 +140,12 @@ BookOasis의 플러그인 설정 화면에서 샘플 업데이트 버튼을 표�
 - 외부 서비스별 요청 오류는 해당 소스 결과만 제외하고 다른 소스 검색은 계속 진행합니다.
 
 ## 변경 이력
+
+### 1.6.2 - 2026-08-11
+
+- 검색 소스 5개를 `검색 소스` 한 줄의 가로 체크박스로 정리
+- 설정 화면에서 세부 소스, 결과 수, 제한 시간, User-Agent, 노벨피아 제한 시간, 카카오페이지 카테고리를 숨기고 기본값 적용
+- 검색 소스·메타 적용 체크박스, 프록시, 쿠키 설정만 표시
 
 ### 1.6.1 - 2026-08-11
 

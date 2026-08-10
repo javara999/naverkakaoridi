@@ -1,84 +1,34 @@
 <div class="nkr-settings-panel">
   <div class="nkr-settings-title">통합 웹툰/웹소설 검색 설정</div>
-  <div class="nkr-settings-desc">검색 대상, 요청 방식, 시리즈 적용 범위를 설정합니다.</div>
+  <div class="nkr-settings-desc">검색 대상, 인증 및 메타데이터 적용 범위를 설정합니다.</div>
   <details class="nkr-settings-section">
     <summary>설정 펼치기 (클릭)</summary>
     <div class="nkr-settings-body">
       <div class="nkr-settings-field">
-        <label for="nkr-sources">세부 검색 사이트(고급)</label>
+        <div class="nkr-field-label">검색 소스</div>
         <div class="nkr-input-container">
-          <input id="nkr-sources" type="text" name="SOURCES" value="all">
-          <p class="hint">일반적으로 all을 유지합니다. 그룹 안에서 일부 사이트만 검색할 때 식별자를 쉼표로 구분합니다.</p>
-        </div>
-      </div>
-      <div class="nkr-settings-field nkr-checkbox-field">
-        <label for="nkr-search-naver">네이버 검색</label>
-        <div class="nkr-input-container">
-          <input id="nkr-search-naver" type="checkbox" name="SEARCH_NAVER" checked>
-          <p class="hint">네이버웹툰과 네이버시리즈를 검색합니다.</p>
-        </div>
-      </div>
-      <div class="nkr-settings-field nkr-checkbox-field">
-        <label for="nkr-search-kakao">카카오 검색</label>
-        <div class="nkr-input-container">
-          <input id="nkr-search-kakao" type="checkbox" name="SEARCH_KAKAO" checked>
-          <p class="hint">카카오웹툰과 카카오페이지를 검색합니다.</p>
-        </div>
-      </div>
-      <div class="nkr-settings-field nkr-checkbox-field">
-        <label for="nkr-search-ridi">리디 검색</label>
-        <div class="nkr-input-container">
-          <input id="nkr-search-ridi" type="checkbox" name="SEARCH_RIDI" checked>
-          <p class="hint">리디를 검색합니다.</p>
-        </div>
-      </div>
-      <div class="nkr-settings-field nkr-checkbox-field">
-        <label for="nkr-search-novelpia">노벨피아 검색</label>
-        <div class="nkr-input-container">
-          <input id="nkr-search-novelpia" type="checkbox" name="SEARCH_NOVELPIA" checked>
-          <p class="hint">노벨피아를 검색합니다.</p>
-        </div>
-      </div>
-      <div class="nkr-settings-field nkr-checkbox-field">
-        <label for="nkr-search-munpia">문피아 검색</label>
-        <div class="nkr-input-container">
-          <input id="nkr-search-munpia" type="checkbox" name="SEARCH_MUNPIA" checked>
-          <p class="hint">문피아를 검색합니다.</p>
-        </div>
-      </div>
-      <div class="nkr-settings-field">
-        <label for="nkr-max-results">최대 검색 결과</label>
-        <div class="nkr-input-container">
-          <input id="nkr-max-results" type="number" name="MAX_RESULTS" value="20" min="1" max="100">
-          <p class="hint">전체 사이트 결과를 합쳐 반환할 최대 개수입니다.</p>
-        </div>
-      </div>
-      <div class="nkr-settings-field">
-        <label for="nkr-timeout">요청 제한 시간</label>
-        <div class="nkr-input-container">
-          <input id="nkr-timeout" type="number" name="TIMEOUT" value="10" min="1" max="60">
-          <p class="hint">외부 사이트 응답을 기다릴 시간(초)입니다.</p>
-        </div>
-      </div>
-      <div class="nkr-settings-field">
-        <label for="nkr-user-agent">User-Agent</label>
-        <div class="nkr-input-container">
-          <input id="nkr-user-agent" type="text" name="USER_AGENT" value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36">
-          <p class="hint">차단 회피가 필요할 때만 변경합니다.</p>
-        </div>
-      </div>
-      <div class="nkr-settings-field">
-        <label for="nkr-proxy-url">HTTP(S) 프록시 URL</label>
-        <div class="nkr-input-container">
-          <input id="nkr-proxy-url" type="password" name="PROXY_URL" placeholder="http://host:port">
-          <p class="hint">선택 사항이며 검색과 표지 다운로드에 공통 적용됩니다.</p>
-        </div>
-      </div>
-      <div class="nkr-settings-field">
-        <label for="nkr-novelpia-timeout">노벨피아 제한 시간</label>
-        <div class="nkr-input-container">
-          <input id="nkr-novelpia-timeout" type="number" name="NOVELPIA_TIMEOUT" value="3" min="1" max="15">
-          <p class="hint">시간 초과 시 5분 동안 노벨피아 요청만 건너뜁니다.</p>
+          <div class="nkr-source-options">
+            <label class="nkr-source-option" for="nkr-search-naver">
+              <input id="nkr-search-naver" type="checkbox" name="SEARCH_NAVER" checked>
+              <span>네이버</span>
+            </label>
+            <label class="nkr-source-option" for="nkr-search-kakao">
+              <input id="nkr-search-kakao" type="checkbox" name="SEARCH_KAKAO" checked>
+              <span>카카오</span>
+            </label>
+            <label class="nkr-source-option" for="nkr-search-ridi">
+              <input id="nkr-search-ridi" type="checkbox" name="SEARCH_RIDI" checked>
+              <span>리디</span>
+            </label>
+            <label class="nkr-source-option" for="nkr-search-novelpia">
+              <input id="nkr-search-novelpia" type="checkbox" name="SEARCH_NOVELPIA" checked>
+              <span>노벨피아</span>
+            </label>
+            <label class="nkr-source-option" for="nkr-search-munpia">
+              <input id="nkr-search-munpia" type="checkbox" name="SEARCH_MUNPIA" checked>
+              <span>문피아</span>
+            </label>
+          </div>
         </div>
       </div>
       <div class="nkr-settings-field nkr-checkbox-field">
@@ -110,6 +60,13 @@
         </div>
       </div>
       <div class="nkr-settings-field">
+        <label for="nkr-proxy-url">HTTP(S) 프록시 URL</label>
+        <div class="nkr-input-container">
+          <input id="nkr-proxy-url" type="password" name="PROXY_URL" placeholder="http://host:port">
+          <p class="hint">선택 사항이며 모든 검색과 표지 다운로드에 적용됩니다.</p>
+        </div>
+      </div>
+      <div class="nkr-settings-field">
         <label for="nkr-naver-cookie">네이버 Cookie</label>
         <div class="nkr-input-container">
           <input id="nkr-naver-cookie" type="password" name="NAVER_COOKIE">
@@ -135,13 +92,6 @@
         <div class="nkr-input-container">
           <input id="nkr-munpia-cookie" type="password" name="MUNPIA_COOKIE">
           <p class="hint">연령 제한 또는 로그인 필요 작품 검색 시에만 입력합니다.</p>
-        </div>
-      </div>
-      <div class="nkr-settings-field">
-        <label for="nkr-kakaopage-category">카카오페이지 카테고리</label>
-        <div class="nkr-input-container">
-          <input id="nkr-kakaopage-category" type="text" name="KAKAOPAGE_CATEGORY" value="all">
-          <p class="hint">all, comic, novel, book 또는 숫자 category_uid를 입력합니다.</p>
         </div>
       </div>
     </div>
