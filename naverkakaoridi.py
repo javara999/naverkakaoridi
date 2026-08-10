@@ -17,7 +17,7 @@ from PIL import Image
 from plugins.metadata.base import BaseMetadataProvider
 
 
-PLUGIN_VERSION = "1.5.2"
+PLUGIN_VERSION = "1.6.0"
 LEGACY_PLUGIN_ID = "naverkakaoridi_meta"
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
 DETAIL_WORKERS = 4
@@ -43,7 +43,7 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             "type": "text",
             "required": False,
             "default": "all",
-            "description": "기본값 all. 사용 가능: all, naver_webtoon, naver_series, kakao_webtoon, kakaopage, ridibooks, novelpia. 여러 개는 콤마로 구분.",
+            "description": "기본값 all. 사용 가능: all, naver_webtoon, naver_series, kakao_webtoon, kakaopage, ridibooks, novelpia, munpia. 여러 개는 콤마로 구분.",
         },
         {
             "key": "MAX_RESULTS",
@@ -142,6 +142,14 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             "description": "기본값 공백. 연령 제한/로그인 필요 작품 검색이 필요할 때만 입력.",
         },
         {
+            "key": "MUNPIA_COOKIE",
+            "label": "문피아 Cookie",
+            "type": "password",
+            "required": False,
+            "default": "",
+            "description": "기본값 공백. 연령 제한/로그인 필요 작품 검색이 필요할 때만 입력.",
+        },
+        {
             "key": "KAKAOPAGE_CATEGORY",
             "label": "카카오페이지 카테고리",
             "type": "text",
@@ -160,7 +168,7 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
         "show_sample_update_button": True,
     }
 
-    SOURCE_ORDER = ("naver_webtoon", "naver_series", "kakao_webtoon", "kakaopage", "ridibooks", "novelpia")
+    SOURCE_ORDER = ("naver_webtoon", "naver_series", "kakao_webtoon", "kakaopage", "ridibooks", "novelpia", "munpia")
     _cache = {}
     _cache_lock = threading.Lock()
     _source_cooldowns = {}
@@ -191,6 +199,8 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
                     results.extend(self._search_ridibooks(query, cfg))
                 elif source == "novelpia":
                     results.extend(self._search_novelpia(query, cfg))
+                elif source == "munpia":
+                    results.extend(self._search_munpia(query, cfg))
             except Exception as e:
                 print(f"[NaverkakaoridiMetadataProvider] {source} search failed: {e}")
             if len(results) >= max_results:
@@ -783,6 +793,37 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             )
         return results
 
+    def _search_munpia(self, query, cfg):
+        url = "https://www.munpia.com/api/v1/main/search?" + urllib.parse.urlencode({"query": query})
+        data = self._get_json(url, cfg, headers=self._munpia_headers(cfg))
+        items = ((data.get("result") or {}).get("searchNovelTabDtos")) or []
+
+        results = []
+        for item in items[: self._int(cfg.get("MAX_RESULTS"), 20, 1, 100)]:
+            if item.get("adult") and not self._truthy(cfg.get("INCLUDE_ADULT")):
+                continue
+            novel_id = item.get("novelId")
+            title = self._clean_text(item.get("title"))
+            if not novel_id or not title:
+                continue
+            genres = [item.get("mainGenre"), item.get("subGenre")]
+            results.append(
+                self._item(
+                    source="문피아",
+                    title=title,
+                    author=self._clean_text(item.get("author")),
+                    publisher="문피아",
+                    cover=item.get("coverUrl") or "",
+                    description=item.get("story") or "",
+                    link=f"https://www.munpia.com/novel/detail/{novel_id}",
+                    genre=", ".join(self._clean_text(value) for value in genres if self._clean_text(value)),
+                    tags=self._join_names(item.get("tag") or []),
+                    pub_date=self._clean_text(item.get("updateAt")),
+                    score="",
+                )
+            )
+        return results
+
     def _get_config(self, db_type):
         defaults = {f["key"]: f.get("default", "") for f in self.config_schema}
         try:
@@ -1047,6 +1088,15 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             headers["Cookie"] = cfg.get("RIDI_COOKIE")
         return headers
 
+    def _munpia_headers(self, cfg):
+        headers = {
+            "Accept": "application/json, text/plain, */*",
+            "Referer": "https://www.munpia.com/",
+        }
+        if cfg.get("MUNPIA_COOKIE"):
+            headers["Cookie"] = cfg.get("MUNPIA_COOKIE")
+        return headers
+
     def _meta_tags(self, text):
         result = {}
         pattern = re.compile(r'<meta\s+([^>]+)>', re.I)
@@ -1192,6 +1242,7 @@ class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
             "ridi": "ridibooks",
             "ridibooks": "ridibooks",
             "novelpia": "novelpia",
+            "munpia": "munpia",
         }
         return {aliases.get(v, v) for v in raw if aliases.get(v, v) in self.SOURCE_ORDER}
 

@@ -8,7 +8,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 플러그인 버전 | `1.5.2` |
+| 플러그인 버전 | `1.6.0` |
 | 플러그인 ID | `naverkakaoridi` |
 | 이전 플러그인 ID | `naverkakaoridi_meta` |
 | 클래스 | `NaverkakaoridiMetadataProvider` |
@@ -29,6 +29,7 @@
 - 카카오페이지 (`kakaopage`)
 - 리디 (`ridibooks`)
 - 노벨피아 (`novelpia`)
+- 문피아 (`munpia`)
 
 `SOURCES`를 `all`로 설정하면 모든 소스를 순서대로 검색합니다. 일부 소스만 사용할 때는 위 식별자를 쉼표로 구분해 입력합니다.
 
@@ -47,7 +48,7 @@
 
 | 키 | UI 유형 | 기본값 | 설명 |
 | --- | --- | --- | --- |
-| `SOURCES` | text | `all` | 검색할 소스(`naver_webtoon`, `naver_series`, `kakao_webtoon`, `kakaopage`, `ridibooks`, `novelpia`). 여러 값은 쉼표로 구분 |
+| `SOURCES` | text | `all` | 검색할 소스(`naver_webtoon`, `naver_series`, `kakao_webtoon`, `kakaopage`, `ridibooks`, `novelpia`, `munpia`). 여러 값은 쉼표로 구분 |
 | `MAX_RESULTS` | number | `20` | 통합 결과 최대 개수, 허용 범위 1~100 |
 | `TIMEOUT` | number | `10` | 외부 요청 제한 시간(초), 허용 범위 1~60 |
 | `USER_AGENT` | text | 내장 브라우저 UA | 외부 요청에 사용할 User-Agent |
@@ -60,6 +61,7 @@
 | `NAVER_COOKIE` | password | 빈 값 | 네이버 로그인/연령 제한용 Cookie |
 | `KAKAO_COOKIE` | password | 빈 값 | 카카오 로그인/연령 제한용 Cookie |
 | `RIDI_COOKIE` | password | 빈 값 | 리디 로그인/연령 제한용 Cookie |
+| `MUNPIA_COOKIE` | password | 빈 값 | 문피아 로그인/연령 제한용 Cookie |
 | `KAKAOPAGE_CATEGORY` | text | `all` | `comic`, `novel`, `book` 또는 숫자 카테고리 ID |
 
 Cookie와 프록시 URL 입력란은 화면에서 비밀번호 형식으로 가려지지만 BookOasis 설정 DB에는 설정 JSON의 일부로 저장됩니다. 필요한 값만 입력하고 계정 보안 정책에 맞게 주기적으로 갱신하세요.
@@ -125,6 +127,12 @@ BookOasis의 플러그인 설정 화면에서 샘플 업데이트 버튼을 표�
 - 외부 서비스별 요청 오류는 해당 소스 결과만 제외하고 다른 소스 검색은 계속 진행합니다.
 
 ## 변경 이력
+
+### 1.6.0 - 2026-08-11
+
+- 문피아(`munpia`) 공식 검색 API 기반 검색 소스 추가
+- 문피아 제목, 작가, 소개, 장르, 태그, 표지, 최근 갱신일 수집
+- 선택적 `MUNPIA_COOKIE` 설정과 공통 프록시 적용
 
 ### 1.5.2 - 2026-08-10
 
