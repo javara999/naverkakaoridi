@@ -17,7 +17,7 @@ from PIL import Image
 from plugins.metadata.base import BaseMetadataProvider
 
 
-PLUGIN_VERSION = "1.6.2"
+PLUGIN_VERSION = "1.6.3"
 LEGACY_PLUGIN_ID = "naverkakaoridi_meta"
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
 DETAIL_WORKERS = 4
@@ -33,7 +33,7 @@ RATING_SCALES = {
 
 class NaverkakaoridiMetadataProvider(BaseMetadataProvider):
     id = "naverkakaoridi"
-    name = "통합 웹툰/웹소설 검색(네이버/카카오/리디)"
+    name = "네카리 웹북 검색"
     version = PLUGIN_VERSION
     is_searchable = True
     config_schema = [
